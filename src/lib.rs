@@ -104,13 +104,15 @@ pub use crate::{
 };
 pub use windows_sys::Win32::{Foundation::HANDLE, NetworkManagement::Ndis::NET_LUID_LH};
 
-// TODO: Get bindgen to scrape these from the `wintun.h`
-// We need to make sure these stay up to date
 /// The maximum size of wintun's internal ring buffer (in bytes)
-pub const MAX_RING_CAPACITY: u32 = 0x400_0000;
+pub const MAX_RING_CAPACITY: u32 = wintun_raw::WINTUN_MAX_RING_CAPACITY;
 
 /// The minimum size of wintun's internal ring buffer (in bytes)
-pub const MIN_RING_CAPACITY: u32 = 0x2_0000;
+pub const MIN_RING_CAPACITY: u32 = wintun_raw::WINTUN_MIN_RING_CAPACITY;
+
+/// The maximum size of an IP packet (in bytes)
+/// <https://en.wikipedia.org/wiki/Maximum_transmission_unit>
+pub const MAX_IP_PACKET_SIZE: u32 = wintun_raw::WINTUN_MAX_IP_PACKET_SIZE;
 
 /// Maximum pool name length including zero terminator
 pub const MAX_POOL: usize = 256;
