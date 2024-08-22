@@ -10,20 +10,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
     env_logger::init();
     let dll_path = misc::get_wintun_bin_relative_path()?;
-    let wintun = unsafe { wintun::load_from_path(dll_path)? };
+    let wintun = unsafe { wintun_bindings::load_from_path(dll_path)? };
 
-    let version = wintun::get_running_driver_version(&wintun);
+    let version = wintun_bindings::get_running_driver_version(&wintun);
     log::info!("Using wintun version: {:?}", version);
 
-    let adapter = match wintun::Adapter::open(&wintun, "Demo") {
+    let adapter = match wintun_bindings::Adapter::open(&wintun, "Demo") {
         Ok(a) => a,
-        Err(_) => wintun::Adapter::create(&wintun, "Demo", "Example", None)?,
+        Err(_) => wintun_bindings::Adapter::create(&wintun, "Demo", "Example", None)?,
     };
 
-    let version = wintun::get_running_driver_version(&wintun)?;
+    let version = wintun_bindings::get_running_driver_version(&wintun)?;
     log::info!("Using wintun version: {:?}", version);
 
-    let session = Arc::new(adapter.start_session(wintun::MAX_RING_CAPACITY)?);
+    let session = Arc::new(adapter.start_session(wintun_bindings::MAX_RING_CAPACITY)?);
 
     let reader_session = session.clone();
     let reader = std::thread::spawn(move || {
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let data = &bytes[0..(20.min(bytes.len()))];
             println!("Read packet size {} bytes. Header data: {:?}", len, data);
         }
-        Ok::<(), wintun::Error>(())
+        Ok::<(), wintun_bindings::Error>(())
     });
     println!("Press enter to stop session");
 
@@ -49,7 +49,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     RUNNING.store(false, Ordering::Relaxed);
     session.shutdown()?;
-    let _ = reader.join().map_err(|err| wintun::Error::from(format!("{:?}", err)))?;
+    let _ = reader
+        .join()
+        .map_err(|err| wintun_bindings::Error::from(format!("{:?}", err)))?;
 
     println!("Shutdown complete");
     Ok(())

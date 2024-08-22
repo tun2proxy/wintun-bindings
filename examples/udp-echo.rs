@@ -51,26 +51,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
     // Loading wintun
     let dll_path = misc::get_wintun_bin_relative_path()?;
-    let wintun = unsafe { wintun::load_from_path(dll_path)? };
+    let wintun = unsafe { wintun_bindings::load_from_path(dll_path)? };
 
-    let version = wintun::get_running_driver_version(&wintun);
+    let version = wintun_bindings::get_running_driver_version(&wintun);
     println!("Wintun version: {:?}", version);
 
     let adapter_name = "Demo";
     let guid = 2131231231231231231_u128;
 
     // Open or create a new adapter
-    let adapter = match wintun::Adapter::open(&wintun, adapter_name) {
+    let adapter = match wintun_bindings::Adapter::open(&wintun, adapter_name) {
         Ok(a) => a,
-        Err(_) => wintun::Adapter::create(&wintun, adapter_name, "MyTunnelType", Some(guid))?,
+        Err(_) => wintun_bindings::Adapter::create(&wintun, adapter_name, "MyTunnelType", Some(guid))?,
     };
 
-    let version = wintun::get_running_driver_version(&wintun)?;
+    let version = wintun_bindings::get_running_driver_version(&wintun)?;
     println!("Wintun version: {}", version);
 
     // set metric command: `netsh interface ipv4 set interface adapter_name metric=255`
     let args = &["interface", "ipv4", "set", "interface", adapter_name, "metric=255"];
-    wintun::run_command("netsh", args)?;
+    wintun_bindings::run_command("netsh", args)?;
     println!("netsh {}", args.join(" "));
 
     // Execute the network card initialization command, setting virtual network card information
@@ -86,7 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "10.28.13.2/24",
         "gateway=10.28.13.1",
     ];
-    wintun::run_command("netsh", args)?;
+    wintun_bindings::run_command("netsh", args)?;
     println!("netsh {}", args.join(" "));
 
     let dns = "8.8.8.8".parse::<IpAddr>().unwrap();
@@ -111,10 +111,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "active adapter gateways: {:?}",
-        wintun::get_active_network_interface_gateways()?
+        wintun_bindings::get_active_network_interface_gateways()?
     );
 
-    let session = Arc::new(adapter.start_session(wintun::MAX_RING_CAPACITY)?);
+    let session = Arc::new(adapter.start_session(wintun_bindings::MAX_RING_CAPACITY)?);
     let reader_session = session.clone();
     let writer_session = session.clone();
 
@@ -223,7 +223,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn extract_udp_packet(packet: &[u8]) -> Result<NaiveUdpPacket, wintun::Error> {
+fn extract_udp_packet(packet: &[u8]) -> Result<NaiveUdpPacket, wintun_bindings::Error> {
     use packet::{ip, udp, AsPacket, Packet};
     let packet: ip::Packet<_> = packet.as_packet().map_err(|err| format!("{}", err))?;
     let info: String;

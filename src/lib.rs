@@ -18,20 +18,20 @@
 //! //Must be run as Administrator because we create network adapters
 //! //Load the wintun dll file so that we can call the underlying C functions
 //! //Unsafe because we are loading an arbitrary dll file
-//! let wintun = unsafe { wintun::load_from_path("path/to/wintun.dll") }
+//! let wintun = unsafe { wintun_bindings::load_from_path("path/to/wintun.dll") }
 //!     .expect("Failed to load wintun dll");
 //!
 //! //Try to open an adapter with the name "Demo"
-//! let adapter = match wintun::Adapter::open(&wintun, "Demo") {
+//! let adapter = match wintun_bindings::Adapter::open(&wintun, "Demo") {
 //!     Ok(a) => a,
 //!     Err(_) => {
 //!         //If loading failed (most likely it didn't exist), create a new one
-//!         wintun::Adapter::create(&wintun, "Demo", "Example", None)
+//!         wintun_bindings::Adapter::create(&wintun, "Demo", "Example", None)
 //!             .expect("Failed to create wintun adapter!")
 //!     }
 //! };
 //! //Specify the size of the ring buffer the wintun driver should use.
-//! let session = Arc::new(adapter.start_session(wintun::MAX_RING_CAPACITY).unwrap());
+//! let session = Arc::new(adapter.start_session(wintun_bindings::MAX_RING_CAPACITY).unwrap());
 //!
 //! //Get a 20 byte packet from the ring buffer
 //! let mut packet = session.allocate_send_packet(20).unwrap();

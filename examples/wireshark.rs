@@ -18,7 +18,7 @@ use windows_sys::Win32::{
     NetworkManagement::IpHelper::{GetBestRoute, MIB_IPFORWARDROW},
     Networking::WinSock::{AF_INET, AF_INET6, SOCKADDR_INET},
 };
-use wintun::{format_message, Error};
+use wintun_bindings::{format_message, Error};
 mod misc;
 
 static RUNNING: AtomicBool = AtomicBool::new(true);
@@ -71,14 +71,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
     let dll_path = misc::get_wintun_bin_relative_path()?;
-    let wintun = unsafe { wintun::load_from_path(dll_path)? };
+    let wintun = unsafe { wintun_bindings::load_from_path(dll_path)? };
 
-    let adapter = match wintun::Adapter::open(&wintun, "Demo") {
+    let adapter = match wintun_bindings::Adapter::open(&wintun, "Demo") {
         Ok(a) => a,
-        Err(_) => wintun::Adapter::create(&wintun, "Demo", "Example", None)?,
+        Err(_) => wintun_bindings::Adapter::create(&wintun, "Demo", "Example", None)?,
     };
 
-    let version = wintun::get_running_driver_version(&wintun)?;
+    let version = wintun_bindings::get_running_driver_version(&wintun)?;
     log::info!("Using wintun version: {:?}", version);
 
     //Give wintun interface ip and gateway
@@ -182,7 +182,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         endianness: pcap_file::Endianness::Little,
     };
     let mut writer = pcap_file::pcap::PcapWriter::with_header(file, header)?;
-    let main_session = Arc::new(adapter.start_session(wintun::MAX_RING_CAPACITY)?);
+    let main_session = Arc::new(adapter.start_session(wintun_bindings::MAX_RING_CAPACITY)?);
 
     let reader_session = main_session.clone();
     let writer_session = main_session.clone();
