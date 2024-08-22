@@ -38,9 +38,9 @@ pub struct Adapter {
 }
 
 fn get_adapter_luid(wintun: &Wintun, adapter: wintun_raw::WINTUN_ADAPTER_HANDLE) -> NET_LUID_LH {
-    let mut luid: wintun_raw::NET_LUID = unsafe { std::mem::zeroed() };
-    unsafe { wintun.WintunGetAdapterLUID(adapter, &mut luid as *mut wintun_raw::NET_LUID) };
-    unsafe { std::mem::transmute(luid) }
+    let mut luid: NET_LUID_LH = unsafe { std::mem::zeroed() };
+    unsafe { wintun.WintunGetAdapterLUID(adapter, &mut luid as *mut NET_LUID_LH) };
+    luid
 }
 
 impl Adapter {
@@ -103,8 +103,8 @@ impl Adapter {
 
         crate::log::set_default_logger_if_unset(wintun);
 
-        let guid_struct: wintun_raw::GUID = unsafe { std::mem::transmute(GUID::from_u128(guid)) };
-        let guid_ptr = &guid_struct as *const wintun_raw::GUID;
+        let guid_struct: GUID = GUID::from_u128(guid);
+        let guid_ptr = &guid_struct as *const GUID;
 
         let result = unsafe { wintun.WintunCreateAdapter(name_utf16.as_ptr(), tunnel_type_utf16.as_ptr(), guid_ptr) };
 

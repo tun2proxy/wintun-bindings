@@ -19,7 +19,7 @@ static SET_LOGGER: AtomicBool = AtomicBool::new(false);
 pub unsafe extern "stdcall" fn default_logger(
     level: wintun_raw::WINTUN_LOGGER_LEVEL,
     _timestamp: wintun_raw::DWORD64,
-    message: *const wintun_raw::WCHAR,
+    message: windows_sys::core::PCWSTR,
 ) {
     //Wintun will always give us a valid UTF16 null termineted string
     let utf8_msg = util::win_pwstr_to_string(message as *mut u16).unwrap_or_else(|e| e.to_string());
