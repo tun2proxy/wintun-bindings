@@ -76,6 +76,8 @@ file.
 debugging packet issues because unsent packets that are dropped without being sent hold up
 wintun's internal ring buffer.
 
+- `verify_binary_signature`: Verifies the signature of the wintun dll file before loading it.
+
 ## TODO:
 - Add async support
 Requires hooking into a windows specific reactor and registering read interest on wintun's read
