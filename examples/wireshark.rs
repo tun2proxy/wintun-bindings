@@ -18,8 +18,7 @@ use windows_sys::Win32::{
     NetworkManagement::IpHelper::{GetBestRoute, MIB_IPFORWARDROW},
     Networking::WinSock::{AF_INET, AF_INET6, SOCKADDR_INET},
 };
-use wintun_bindings::{format_message, Error};
-mod misc;
+use wintun_bindings::{format_message, get_wintun_bin_pattern_path, BoxError, Error};
 
 static RUNNING: AtomicBool = AtomicBool::new(true);
 
@@ -66,11 +65,11 @@ impl RouteCmd {
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), BoxError> {
     dotenvy::dotenv().ok();
     env_logger::init();
 
-    let dll_path = misc::get_wintun_bin_relative_path()?;
+    let dll_path = get_wintun_bin_pattern_path()?;
     let wintun = unsafe { wintun_bindings::load_from_path(dll_path)? };
 
     let adapter = match wintun_bindings::Adapter::open(&wintun, "Demo") {

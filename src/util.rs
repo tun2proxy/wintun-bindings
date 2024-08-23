@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::{BoxError, Error};
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use windows_sys::{
     core::GUID,
@@ -24,6 +24,25 @@ use windows_sys::{
         },
     },
 };
+
+#[doc(hidden)]
+pub fn get_wintun_bin_pattern_path() -> std::io::Result<std::path::PathBuf> {
+    let dll_path = if cfg!(target_arch = "x86") {
+        "wintun/bin/x86/wintun.dll"
+    } else if cfg!(target_arch = "x86_64") {
+        "wintun/bin/amd64/wintun.dll"
+    } else if cfg!(target_arch = "arm") {
+        "wintun/bin/arm/wintun.dll"
+    } else if cfg!(target_arch = "aarch64") {
+        "wintun/bin/arm64/wintun.dll"
+    } else {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Unsupported architecture",
+        ));
+    };
+    Ok(dll_path.into())
+}
 
 pub(crate) const fn win_guid_to_u128(guid: &GUID) -> u128 {
     let data4_u64 = u64::from_be_bytes(guid.data4);
@@ -342,7 +361,7 @@ fn MAKELANGID(p: u32, s: u32) -> u32 {
 }
 
 /// Returns a a human readable error message from a windows error code
-pub fn format_message(error_code: u32) -> Result<String, Box<dyn std::error::Error>> {
+pub fn format_message(error_code: u32) -> Result<String, BoxError> {
     let buf: *mut u16 = std::ptr::null_mut();
 
     let chars_written = unsafe {

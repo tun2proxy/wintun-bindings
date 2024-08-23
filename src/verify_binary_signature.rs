@@ -264,24 +264,6 @@ mod tests {
     use super::super::*;
     use super::*;
 
-    fn get_wintun_bin_pattern_path() -> std::io::Result<std::path::PathBuf> {
-        let dll_path = if cfg!(target_arch = "x86") {
-            "wintun/bin/x86/wintun.dll"
-        } else if cfg!(target_arch = "x86_64") {
-            "wintun/bin/amd64/wintun.dll"
-        } else if cfg!(target_arch = "arm") {
-            "wintun/bin/arm/wintun.dll"
-        } else if cfg!(target_arch = "aarch64") {
-            "wintun/bin/arm64/wintun.dll"
-        } else {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Unsupported architecture",
-            ));
-        };
-        Ok(dll_path.into())
-    }
-
     fn get_crate_dir(crate_name: &str) -> Result<std::path::PathBuf, BoxError> {
         let output = std::process::Command::new("cargo")
             .arg("metadata")

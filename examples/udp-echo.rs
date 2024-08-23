@@ -15,7 +15,10 @@ use windows_sys::Win32::{
     Foundation::FALSE,
     Security::Cryptography::{CryptAcquireContextW, CryptGenRandom, CryptReleaseContext, PROV_RSA_FULL},
 };
-mod misc;
+use wintun_bindings::{
+    get_active_network_interface_gateways, get_running_driver_version, get_wintun_bin_pattern_path, load_from_path,
+    run_command, Adapter, BoxError, Error, MAX_RING_CAPACITY,
+};
 
 #[derive(Debug)]
 struct NaiveUdpPacket {
@@ -46,31 +49,31 @@ impl std::fmt::Display for NaiveUdpPacket {
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), BoxError> {
     dotenvy::dotenv().ok();
     env_logger::init();
     // Loading wintun
-    let dll_path = misc::get_wintun_bin_relative_path()?;
-    let wintun = unsafe { wintun_bindings::load_from_path(dll_path)? };
+    let dll_path = get_wintun_bin_pattern_path()?;
+    let wintun = unsafe { load_from_path(dll_path)? };
 
-    let version = wintun_bindings::get_running_driver_version(&wintun);
+    let version = get_running_driver_version(&wintun);
     println!("Wintun version: {:?}", version);
 
     let adapter_name = "Demo";
     let guid = 2131231231231231231_u128;
 
     // Open or create a new adapter
-    let adapter = match wintun_bindings::Adapter::open(&wintun, adapter_name) {
+    let adapter = match Adapter::open(&wintun, adapter_name) {
         Ok(a) => a,
-        Err(_) => wintun_bindings::Adapter::create(&wintun, adapter_name, "MyTunnelType", Some(guid))?,
+        Err(_) => Adapter::create(&wintun, adapter_name, "MyTunnelType", Some(guid))?,
     };
 
-    let version = wintun_bindings::get_running_driver_version(&wintun)?;
+    let version = get_running_driver_version(&wintun)?;
     println!("Wintun version: {}", version);
 
     // set metric command: `netsh interface ipv4 set interface adapter_name metric=255`
     let args = &["interface", "ipv4", "set", "interface", adapter_name, "metric=255"];
-    wintun_bindings::run_command("netsh", args)?;
+    run_command("netsh", args)?;
     println!("netsh {}", args.join(" "));
 
     // Execute the network card initialization command, setting virtual network card information
@@ -86,7 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "10.28.13.2/24",
         "gateway=10.28.13.1",
     ];
-    wintun_bindings::run_command("netsh", args)?;
+    run_command("netsh", args)?;
     println!("netsh {}", args.join(" "));
 
     let dns = "8.8.8.8".parse::<IpAddr>().unwrap();
@@ -111,10 +114,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "active adapter gateways: {:?}",
-        wintun_bindings::get_active_network_interface_gateways()?
+        get_active_network_interface_gateways()?
     );
 
-    let session = Arc::new(adapter.start_session(wintun_bindings::MAX_RING_CAPACITY)?);
+    let session = Arc::new(adapter.start_session(MAX_RING_CAPACITY)?);
     let reader_session = session.clone();
     let writer_session = session.clone();
 
@@ -146,7 +149,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // send to writer
                 tx.send(udp_packet)?;
             }
-            Ok::<(), Box<dyn std::error::Error>>(())
+            Ok::<(), BoxError>(())
         };
         if let Err(err) = block() {
             println!("Reader {}", err);
@@ -204,7 +207,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // Send the response packet
                 writer_session.send_packet(write_pack);
             }
-            Ok::<(), Box<dyn std::error::Error>>(())
+            Ok::<(), BoxError>(())
         };
         if let Err(err) = block() {
             println!("Writer {}", err);
@@ -223,7 +226,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn extract_udp_packet(packet: &[u8]) -> Result<NaiveUdpPacket, wintun_bindings::Error> {
+fn extract_udp_packet(packet: &[u8]) -> Result<NaiveUdpPacket, Error> {
     use packet::{ip, udp, AsPacket, Packet};
     let packet: ip::Packet<_> = packet.as_packet().map_err(|err| format!("{}", err))?;
     let info: String;

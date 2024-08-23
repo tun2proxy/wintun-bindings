@@ -85,10 +85,8 @@ impl Adapter {
 
         crate::log::set_default_logger_if_unset(wintun);
 
-        let guid_struct: GUID = GUID::from_u128(guid);
-        let guid_ptr = &guid_struct as *const GUID;
-
-        let result = unsafe { wintun.WintunCreateAdapter(name_utf16.as_ptr(), tunnel_type_utf16.as_ptr(), guid_ptr) };
+        let guid_s: GUID = GUID::from_u128(guid);
+        let result = unsafe { wintun.WintunCreateAdapter(name_utf16.as_ptr(), tunnel_type_utf16.as_ptr(), &guid_s) };
 
         if result.is_null() {
             Err("Failed to create adapter".into())

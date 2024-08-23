@@ -3,11 +3,10 @@ use windows_sys::core::GUID;
 use windows_sys::Win32::NetworkManagement::IpHelper::{
     ConvertInterfaceAliasToLuid, ConvertInterfaceLuidToAlias, ConvertInterfaceLuidToGuid, ConvertInterfaceLuidToIndex,
 };
-use windows_sys::Win32::NetworkManagement::Ndis::NET_LUID_LH;
+use windows_sys::Win32::NetworkManagement::Ndis::{IF_MAX_STRING_SIZE, NET_LUID_LH};
 
 pub fn luid_to_alias(luid: &NET_LUID_LH) -> io::Result<Vec<u16>> {
-    // IF_MAX_STRING_SIZE + 1
-    let mut alias = vec![0; 257];
+    let mut alias = vec![0; IF_MAX_STRING_SIZE as usize + 1];
 
     match unsafe { ConvertInterfaceLuidToAlias(luid, alias.as_mut_ptr(), alias.len()) } {
         0 => Ok(alias),

@@ -2,14 +2,13 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
-mod misc;
 
 static RUNNING: AtomicBool = AtomicBool::new(true);
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), wintun_bindings::BoxError> {
     dotenvy::dotenv().ok();
     env_logger::init();
-    let dll_path = misc::get_wintun_bin_relative_path()?;
+    let dll_path = wintun_bindings::get_wintun_bin_pattern_path()?;
     let wintun = unsafe { wintun_bindings::load_from_path(dll_path)? };
 
     let version = wintun_bindings::get_running_driver_version(&wintun);
