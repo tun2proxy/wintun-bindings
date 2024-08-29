@@ -67,7 +67,7 @@ impl Drop for Packet {
                     //     ring buffer that the wintun session owns. We return that region of
                     //     memory back to wintun here
                     self.session
-                        .wintun
+                        .get_wintun()
                         .WintunReleaseReceivePacket(self.session.session.0, self.bytes.as_ptr())
                 };
             }

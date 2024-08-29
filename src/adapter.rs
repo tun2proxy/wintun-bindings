@@ -30,7 +30,7 @@ use windows_sys::{
 /// Wrapper around a <https://git.zx2c4.com/wintun/about/#wintun_adapter_handle>
 pub struct Adapter {
     adapter: UnsafeHandle<wintun_raw::WINTUN_ADAPTER_HANDLE>,
-    wintun: Wintun,
+    pub(crate) wintun: Wintun,
     guid: u128,
     index: u32,
     luid: NET_LUID_LH,
@@ -89,18 +89,17 @@ impl Adapter {
         let result = unsafe { wintun.WintunCreateAdapter(name_utf16.as_ptr(), tunnel_type_utf16.as_ptr(), &guid_s) };
 
         if result.is_null() {
-            Err("Failed to create adapter".into())
-        } else {
-            let luid = crate::ffi::alias_to_luid(&name_utf16)?;
-            let index = crate::ffi::luid_to_index(&luid)?;
-            Ok(Arc::new(Adapter {
-                adapter: UnsafeHandle(result),
-                wintun: wintun.clone(),
-                guid,
-                index,
-                luid,
-            }))
+            return Err("Failed to create adapter".into());
         }
+        let luid = crate::ffi::alias_to_luid(&name_utf16)?;
+        let index = crate::ffi::luid_to_index(&luid)?;
+        Ok(Arc::new(Adapter {
+            adapter: UnsafeHandle(result),
+            wintun: wintun.clone(),
+            guid,
+            index,
+            luid,
+        }))
     }
 
     /// Attempts to open an existing wintun interface name `name`.
@@ -112,20 +111,19 @@ impl Adapter {
         let result = unsafe { wintun.WintunOpenAdapter(name_utf16.as_ptr()) };
 
         if result.is_null() {
-            Err("WintunOpenAdapter failed".into())
-        } else {
-            let luid = crate::ffi::alias_to_luid(&name_utf16)?;
-            let index = crate::ffi::luid_to_index(&luid)?;
-            let guid = crate::ffi::luid_to_guid(&luid)?;
-            let guid = util::win_guid_to_u128(&guid);
-            Ok(Arc::new(Adapter {
-                adapter: UnsafeHandle(result),
-                wintun: wintun.clone(),
-                guid,
-                index,
-                luid,
-            }))
+            return Err("WintunOpenAdapter failed".into());
         }
+        let luid = crate::ffi::alias_to_luid(&name_utf16)?;
+        let index = crate::ffi::luid_to_index(&luid)?;
+        let guid = crate::ffi::luid_to_guid(&luid)?;
+        let guid = util::win_guid_to_u128(&guid);
+        Ok(Arc::new(Adapter {
+            adapter: UnsafeHandle(result),
+            wintun: wintun.clone(),
+            guid,
+            index,
+            luid,
+        }))
     }
 
     /// Delete an adapter, consuming it in the process
@@ -153,17 +151,15 @@ impl Adapter {
         let result = unsafe { self.wintun.WintunStartSession(self.adapter.0, capacity) };
 
         if result.is_null() {
-            Err("WintunStartSession failed".into())
-        } else {
-            let shutdown_event = unsafe { CreateEventA(std::ptr::null_mut(), FALSE, FALSE, std::ptr::null_mut()) };
-            Ok(session::Session {
-                session: UnsafeHandle(result),
-                wintun: self.wintun.clone(),
-                read_event: OnceLock::new(),
-                shutdown_event: UnsafeHandle(shutdown_event),
-                adapter: Arc::clone(self),
-            })
+            return Err("WintunStartSession failed".into());
         }
+        let shutdown_event = unsafe { CreateEventA(std::ptr::null_mut(), FALSE, FALSE, std::ptr::null_mut()) };
+        Ok(session::Session {
+            session: UnsafeHandle(result),
+            read_event: OnceLock::new(),
+            shutdown_event: UnsafeHandle(shutdown_event),
+            adapter: self.clone(),
+        })
     }
 
     /// Returns the Win32 LUID for this adapter
