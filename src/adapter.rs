@@ -40,8 +40,7 @@ impl Adapter {
     /// Returns the `Friendly Name` of this adapter,
     /// which is the human readable name shown in Windows
     pub fn get_name(&self) -> Result<String, Error> {
-        let name = crate::ffi::luid_to_alias(&self.luid)?;
-        Ok(util::decode_utf16(&name))
+        Ok(crate::ffi::luid_to_alias(&self.luid)?)
     }
 
     /// Sets the `Friendly Name` of this adapter,
@@ -91,7 +90,7 @@ impl Adapter {
         if result.is_null() {
             return Err("Failed to create adapter".into());
         }
-        let luid = crate::ffi::alias_to_luid(&name_utf16)?;
+        let luid = crate::ffi::alias_to_luid(name)?;
         let index = crate::ffi::luid_to_index(&luid)?;
         Ok(Arc::new(Adapter {
             adapter: UnsafeHandle(result),
@@ -113,7 +112,7 @@ impl Adapter {
         if result.is_null() {
             return Err("WintunOpenAdapter failed".into());
         }
-        let luid = crate::ffi::alias_to_luid(&name_utf16)?;
+        let luid = crate::ffi::alias_to_luid(name)?;
         let index = crate::ffi::luid_to_index(&luid)?;
         let guid = crate::ffi::luid_to_guid(&luid)?;
         let guid = util::win_guid_to_u128(&guid);
