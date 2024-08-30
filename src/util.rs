@@ -75,15 +75,6 @@ pub(crate) unsafe fn win_pwstr_to_string(pwstr: ::windows_sys::core::PWSTR) -> R
         .map_err(|e| format!("Invalid UTF-8 sequence: {:?}", e).into())
 }
 
-/// A wrapper struct that allows a type to be Send and Sync
-#[derive(Copy, Clone, Debug)]
-pub(crate) struct UnsafeHandle<T>(pub T);
-
-/// We never read from the pointer. It only serves as a handle we pass to the kernel or C code that
-/// doesn't have the same mutable aliasing restrictions we have in Rust
-unsafe impl<T> Send for UnsafeHandle<T> {}
-unsafe impl<T> Sync for UnsafeHandle<T> {}
-
 pub(crate) fn guid_to_win_style_string(guid: &GUID) -> Result<String, Error> {
     let mut buffer = [0u16; 40];
     unsafe { StringFromGUID2(guid, &mut buffer as *mut u16, buffer.len() as i32) };

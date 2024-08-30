@@ -5,8 +5,9 @@
 /// wintun functionality
 use crate::{
     error::{Error, OutOfRangeData},
+    handle::{SafeEvent, UnsafeHandle},
     session,
-    util::{self, UnsafeHandle},
+    util::{self},
     wintun_raw, Wintun,
 };
 use std::{
@@ -20,11 +21,7 @@ use std::{
 };
 use windows_sys::{
     core::GUID,
-    Win32::{
-        Foundation::FALSE,
-        NetworkManagement::{IpHelper::ConvertLengthToIpv4Mask, Ndis::NET_LUID_LH},
-        System::Threading::CreateEventA,
-    },
+    Win32::NetworkManagement::{IpHelper::ConvertLengthToIpv4Mask, Ndis::NET_LUID_LH},
 };
 
 /// Wrapper around a <https://git.zx2c4.com/wintun/about/#wintun_adapter_handle>
@@ -149,7 +146,7 @@ impl Adapter {
     ///
     /// Capacity is the size in bytes of the ring buffer used internally by the driver. Must be
     /// a power of two between [`crate::MIN_RING_CAPACITY`] and [`crate::MAX_RING_CAPACITY`] inclusive.
-    pub fn start_session(self: &Arc<Self>, capacity: u32) -> Result<session::Session, Error> {
+    pub fn start_session(self: &Arc<Self>, capacity: u32) -> Result<Arc<session::Session>, Error> {
         Self::validate_capacity(capacity)?;
 
         let result = unsafe { self.wintun.WintunStartSession(self.adapter.0, capacity) };
@@ -157,13 +154,14 @@ impl Adapter {
         if result.is_null() {
             return Err("WintunStartSession failed".into());
         }
-        let shutdown_event = unsafe { CreateEventA(std::ptr::null_mut(), FALSE, FALSE, std::ptr::null_mut()) };
-        Ok(session::Session {
+        // Manual reset, because we use this event once and it must fire on all threads
+        let shutdown_event = SafeEvent::new(true, false)?;
+        Ok(Arc::new(session::Session {
             session: UnsafeHandle(result),
             read_event: OnceLock::new(),
-            shutdown_event: UnsafeHandle(shutdown_event),
+            shutdown_event: Arc::new(shutdown_event),
             adapter: self.clone(),
-        })
+        }))
     }
 
     /// Returns the Win32 LUID for this adapter

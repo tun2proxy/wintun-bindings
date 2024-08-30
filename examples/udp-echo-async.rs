@@ -3,20 +3,19 @@
 //! You can see packets being received by wintun by runnig: `nc -u 10.28.13.100 4321`
 //! and sending lines of text.
 
+use futures::{AsyncReadExt, AsyncWriteExt};
 use std::{
     net::{IpAddr, SocketAddr},
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        mpsc::channel,
-    },
+    sync::atomic::{AtomicBool, Ordering},
 };
+use tokio::sync::mpsc::channel;
 use windows_sys::Win32::{
     Foundation::FALSE,
     Security::Cryptography::{CryptAcquireContextW, CryptGenRandom, CryptReleaseContext, PROV_RSA_FULL},
 };
 use wintun_bindings::{
     get_active_network_interface_gateways, get_running_driver_version, get_wintun_bin_pattern_path, load_from_path,
-    run_command, Adapter, BoxError, Error, MAX_RING_CAPACITY,
+    run_command, Adapter, AsyncSession, BoxError, Error, MAX_RING_CAPACITY,
 };
 
 #[derive(Debug)]
@@ -48,7 +47,8 @@ impl std::fmt::Display for NaiveUdpPacket {
     }
 }
 
-fn main() -> Result<(), BoxError> {
+#[tokio::main]
+async fn main() -> Result<(), BoxError> {
     dotenvy::dotenv().ok();
     env_logger::init();
     // Loading wintun
@@ -117,22 +117,27 @@ fn main() -> Result<(), BoxError> {
     );
 
     let session = adapter.start_session(MAX_RING_CAPACITY)?;
-    let reader_session = session.clone();
-    let writer_session = session.clone();
 
-    let (tx, rx) = channel::<NaiveUdpPacket>();
+    let mut reader_session = AsyncSession::from(session.clone());
+    let mut writer_session: AsyncSession = session.clone().into();
+
+    let (tx, mut rx) = channel::<NaiveUdpPacket>(1000);
 
     // Global flag to stop the session
     static RUNNING: AtomicBool = AtomicBool::new(true);
 
-    let reader = std::thread::spawn(move || {
-        let block = || {
+    let reader = tokio::task::spawn(async move {
+        let block = async {
             while RUNNING.load(Ordering::Relaxed) {
-                let packet = reader_session.receive_blocking()?;
-                // recieved IP packet
-                let bytes = packet.bytes();
+                let mut bytes = [0u8; 1500];
 
-                let udp_packet = extract_udp_packet(bytes);
+                // recieved IP packet
+                let len = reader_session.read(&mut bytes).await?;
+                if len == 0 {
+                    break;
+                }
+
+                let udp_packet = extract_udp_packet(&bytes[..len]);
                 if let Err(err) = udp_packet {
                     println!("{}", err);
                     continue;
@@ -146,19 +151,19 @@ fn main() -> Result<(), BoxError> {
                 udp_packet.dst_addr = src_addr;
 
                 // send to writer
-                tx.send(udp_packet)?;
+                tx.send(udp_packet).await?;
             }
             Ok::<(), BoxError>(())
         };
-        if let Err(err) = block() {
+        if let Err(err) = block.await {
             println!("Reader {}", err);
         }
     });
 
-    let writer = std::thread::spawn(move || {
-        let block = || {
+    let writer = tokio::task::spawn(async move {
+        let block = async {
             while RUNNING.load(Ordering::Relaxed) {
-                let resp = rx.recv()?;
+                let resp = rx.recv().await.ok_or("Channel closed")?;
 
                 let src_addr = match resp.src_addr.ip() {
                     IpAddr::V4(addr) => addr,
@@ -200,15 +205,11 @@ fn main() -> Result<(), BoxError> {
                 //     &resp.data,
                 // );
 
-                let mut write_pack = writer_session.allocate_send_packet(ip_packet.len() as u16)?;
-                write_pack.bytes_mut().copy_from_slice(ip_packet.as_ref());
-
-                // Send the response packet
-                writer_session.send_packet(write_pack);
+                writer_session.write_all(&ip_packet).await?;
             }
             Ok::<(), BoxError>(())
         };
-        if let Err(err) = block() {
+        if let Err(err) = block.await {
             println!("Writer {}", err);
         }
     });
@@ -220,8 +221,8 @@ fn main() -> Result<(), BoxError> {
     println!("Shutting down session");
     RUNNING.store(false, Ordering::Relaxed);
     session.shutdown()?;
-    let _ = reader.join();
-    let _ = writer.join();
+    let _ = reader.await;
+    let _ = writer.await;
     Ok(())
 }
 

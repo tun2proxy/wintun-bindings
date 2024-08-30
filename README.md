@@ -38,7 +38,7 @@ let adapter = match wintun_bindings::Adapter::open(&wintun, "Demo") {
     }
 };
 //Specify the size of the ring buffer the wintun driver should use.
-let session = Arc::new(adapter.start_session(wintun_bindings::MAX_RING_CAPACITY).unwrap());
+let session = adapter.start_session(wintun_bindings::MAX_RING_CAPACITY).unwrap();
 
 //Get a 20 byte packet from the ring buffer
 let mut packet = session.allocate_send_packet(20).unwrap();
@@ -78,10 +78,19 @@ wintun's internal ring buffer.
 
 - `verify_binary_signature`: Verifies the signature of the wintun dll file before loading it.
 
-## TODO:
-- Add async support
-Requires hooking into a windows specific reactor and registering read interest on wintun's read
-handle. Asyncify other slow operations via tokio::spawn_blocking. As always, PR's are welcome!
-
+- `async`: Enables async support for the library.
+  Just add `async` feature to your `Cargo.toml`:
+  ```toml
+  [dependencies]
+  wintun-bindings = { version = "0.6", features = ["async"] }
+  ```
+  And simply transform your `Session` into an `AsyncSession`:
+  ```rust
+  // ...
+  let session = adapter.start_session(MAX_RING_CAPACITY)?;
+  let mut reader_session = AsyncSession::from(session.clone());
+  let mut writer_session: AsyncSession = session.clone().into();
+  // ...
+  ```
 
 License: MIT
