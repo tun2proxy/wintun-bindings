@@ -82,7 +82,7 @@ wintun's internal ring buffer.
   Just add `async` feature to your `Cargo.toml`:
   ```toml
   [dependencies]
-  wintun-bindings = { version = "0.6", features = ["async"] }
+  wintun-bindings = { version = "0.7", features = ["async"] }
   ```
   And simply transform your `Session` into an `AsyncSession`:
   ```rust
