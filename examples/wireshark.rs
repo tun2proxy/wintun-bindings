@@ -6,10 +6,7 @@ use packet::Builder;
 use std::{
     fs::File,
     net::IpAddr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicBool, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
 use subprocess::{Popen, PopenConfig, Redirection};
@@ -181,7 +178,7 @@ fn main() -> Result<(), BoxError> {
         endianness: pcap_file::Endianness::Little,
     };
     let mut writer = pcap_file::pcap::PcapWriter::with_header(file, header)?;
-    let main_session = Arc::new(adapter.start_session(wintun_bindings::MAX_RING_CAPACITY)?);
+    let main_session = adapter.start_session(wintun_bindings::MAX_RING_CAPACITY)?;
 
     let reader_session = main_session.clone();
     let writer_session = main_session.clone();

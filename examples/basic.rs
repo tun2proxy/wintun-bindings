@@ -1,7 +1,4 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 static RUNNING: AtomicBool = AtomicBool::new(true);
 
@@ -22,7 +19,7 @@ fn main() -> Result<(), wintun_bindings::BoxError> {
     let version = wintun_bindings::get_running_driver_version(&wintun)?;
     log::info!("Using wintun version: {:?}", version);
 
-    let session = Arc::new(adapter.start_session(wintun_bindings::MAX_RING_CAPACITY)?);
+    let session = adapter.start_session(wintun_bindings::MAX_RING_CAPACITY)?;
 
     let reader_session = session.clone();
     let reader = std::thread::spawn(move || {

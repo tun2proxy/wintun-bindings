@@ -31,7 +31,7 @@
 //!     }
 //! };
 //! //Specify the size of the ring buffer the wintun driver should use.
-//! let session = Arc::new(adapter.start_session(wintun_bindings::MAX_RING_CAPACITY).unwrap());
+//! let session = adapter.start_session(wintun_bindings::MAX_RING_CAPACITY).unwrap();
 //!
 //! //Get a 20 byte packet from the ring buffer
 //! let mut packet = session.allocate_send_packet(20).unwrap();
@@ -76,8 +76,11 @@
 //!
 
 mod adapter;
+#[cfg(feature = "async")]
+mod async_session;
 mod error;
 mod ffi;
+mod handle;
 mod log;
 mod packet;
 mod session;
@@ -92,9 +95,13 @@ pub(crate) const WINTUN_PROVIDER: &str = "WireGuard LLC";
 #[allow(dead_code, unused_variables, deref_nullptr, clippy::all)]
 mod wintun_raw;
 
+#[cfg(feature = "async")]
+pub use crate::async_session::AsyncSession;
+
 pub use crate::{
     adapter::Adapter,
     error::{BoxError, Error, OutOfRangeData, Result},
+    handle::UnsafeHandle,
     log::{default_logger, reset_logger, set_logger},
     packet::Packet,
     session::Session,
