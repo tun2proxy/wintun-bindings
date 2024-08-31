@@ -19,8 +19,7 @@ Then either call [`Adapter::create`] or [`Adapter::open`] to obtain a wintun
 adapter. Start a session with [`Adapter::start_session`].
 
 ## Example
-```rust
-use std::sync::Arc;
+```rust, no_run
 
 //Must be run as Administrator because we create network adapters
 //Load the wintun dll file so that we can call the underlying C functions
@@ -58,7 +57,7 @@ session.send_packet(packet);
 //Stop any readers blocking for data on other threads
 //Only needed when a blocking reader is preventing shutdown Ie. it holds an Arc to the
 //session, blocking it from being dropped
-session.shutdown();
+let _ = session.shutdown();
 
 //the session is stopped on drop
 //drop(session);
@@ -73,8 +72,8 @@ file.
 ## Features
 
 - `panic_on_unsent_packets`: Panics if a send packet is dropped without being sent. Useful for
-debugging packet issues because unsent packets that are dropped without being sent hold up
-wintun's internal ring buffer.
+  debugging packet issues because unsent packets that are dropped without being sent hold up
+  wintun's internal ring buffer.
 
 - `verify_binary_signature`: Verifies the signature of the wintun dll file before loading it.
 
@@ -85,7 +84,7 @@ wintun's internal ring buffer.
   wintun-bindings = { version = "0.7", features = ["async"] }
   ```
   And simply transform your `Session` into an `AsyncSession`:
-  ```rust
+  ```rust, ignore
   // ...
   let session = adapter.start_session(MAX_RING_CAPACITY)?;
   let mut reader_session = AsyncSession::from(session.clone());

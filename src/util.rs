@@ -352,6 +352,7 @@ fn MAKELANGID(p: u32, s: u32) -> u32 {
 }
 
 /// Returns a a human readable error message from a windows error code
+#[doc(hidden)]
 pub fn format_message(error_code: u32) -> Result<String, BoxError> {
     let buf: *mut u16 = std::ptr::null_mut();
 
