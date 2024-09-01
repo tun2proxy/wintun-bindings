@@ -88,7 +88,7 @@ impl AsyncRead for AsyncSession {
                         Err(e) => {
                             self.read_state = ReadState::Waiting(Some(task));
                             use std::io::{Error, ErrorKind};
-                            return Poll::Ready(Err(Error::new(ErrorKind::Other, format!("lock task fail: {:?}", e))));
+                            return Poll::Ready(Err(Error::new(ErrorKind::Other, format!("Lock task failed: {}", e))));
                         }
                     };
                     self.read_state = match Pin::new(&mut *task_guard).poll(cx) {
