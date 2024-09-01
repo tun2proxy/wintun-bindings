@@ -69,3 +69,8 @@ tokio = { version = "1", features = ["full"] }
 name = "udp-echo-async"
 path = "examples/udp-echo-async.rs"
 required-features = ["async"]
+
+[[example]]
+name = "basic-async"
+path = "examples/basic-async.rs"
+required-features = ["async"]
