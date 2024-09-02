@@ -28,6 +28,14 @@ pub struct AsyncSession {
     read_state: ReadState,
 }
 
+impl std::ops::Deref for AsyncSession {
+    type Target = crate::session::Session;
+
+    fn deref(&self) -> &Self::Target {
+        &self.session
+    }
+}
+
 impl From<Arc<crate::session::Session>> for AsyncSession {
     fn from(session: Arc<crate::session::Session>) -> Self {
         Self {
