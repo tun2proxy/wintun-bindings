@@ -9,6 +9,7 @@ use windows_sys::Win32::{
 };
 
 /// Wrapper around a <https://git.zx2c4.com/wintun/about/#wintun_session_handle>
+#[derive(Clone)]
 pub struct Session {
     /// The session handle given to us by WintunStartSession
     pub(crate) session: UnsafeHandle<wintun_raw::WINTUN_SESSION_HANDLE>,
