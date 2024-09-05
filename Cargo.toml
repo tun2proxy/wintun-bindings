@@ -33,7 +33,7 @@ verify_binary_signature = []
 
 [dependencies]
 blocking = { version = "1", optional = true }
-c2rust-bitfields = "0.18"
+c2rust-bitfields = "0.19"
 futures = { version = "0.3", optional = true }
 libloading = "0.8"
 log = "0.4"
