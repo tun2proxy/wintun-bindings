@@ -1,4 +1,4 @@
-use crate::session;
+use crate::session::Session;
 use std::sync::Arc;
 
 pub(crate) enum Kind {
@@ -38,7 +38,7 @@ pub struct Packet {
 
     /// Share ownership of session to prevent the session from being dropped before packets that
     /// belong to it
-    pub(crate) session: Arc<session::Session>,
+    pub(crate) session: Arc<Session>,
 }
 
 impl Packet {

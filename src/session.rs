@@ -9,7 +9,6 @@ use windows_sys::Win32::{
 };
 
 /// Wrapper around a <https://git.zx2c4.com/wintun/about/#wintun_session_handle>
-#[derive(Clone)]
 pub struct Session {
     /// The session handle given to us by WintunStartSession
     pub(crate) session: UnsafeHandle<wintun_raw::WINTUN_SESSION_HANDLE>,
@@ -155,10 +154,9 @@ impl Session {
 
 impl Drop for Session {
     fn drop(&mut self) {
-        if let Err(err) = self.shutdown_event.close_handle() {
-            log::error!("Failed to close handle of shutdown event: {:?}", err);
+        if let Err(e) = self.shutdown() {
+            log::trace!("Failed to shutdown session: {}", e);
         }
-
         unsafe { self.get_wintun().WintunEndSession(self.session.0) };
         self.session.0 = ptr::null_mut();
     }

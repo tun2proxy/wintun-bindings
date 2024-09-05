@@ -6,7 +6,7 @@
 use crate::{
     error::{Error, OutOfRangeData},
     handle::{SafeEvent, UnsafeHandle},
-    session,
+    session::Session,
     util::{self},
     wintun_raw, Wintun,
 };
@@ -146,7 +146,7 @@ impl Adapter {
     ///
     /// Capacity is the size in bytes of the ring buffer used internally by the driver. Must be
     /// a power of two between [`crate::MIN_RING_CAPACITY`] and [`crate::MAX_RING_CAPACITY`] inclusive.
-    pub fn start_session(self: &Arc<Self>, capacity: u32) -> Result<Arc<session::Session>, Error> {
+    pub fn start_session(self: &Arc<Self>, capacity: u32) -> Result<Arc<Session>, Error> {
         Self::validate_capacity(capacity)?;
 
         let result = unsafe { self.wintun.WintunStartSession(self.adapter.0, capacity) };
@@ -156,7 +156,7 @@ impl Adapter {
         }
         // Manual reset, because we use this event once and it must fire on all threads
         let shutdown_event = SafeEvent::new(true, false)?;
-        Ok(Arc::new(session::Session {
+        Ok(Arc::new(Session {
             session: UnsafeHandle(result),
             read_event: OnceLock::new(),
             shutdown_event: Arc::new(shutdown_event),

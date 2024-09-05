@@ -1,4 +1,4 @@
-use crate::handle::UnsafeHandle;
+use crate::{handle::UnsafeHandle, session::Session};
 use futures::{AsyncRead, AsyncWrite};
 use std::future::Future;
 use std::pin::Pin;
@@ -24,30 +24,24 @@ enum ReadState {
 
 #[derive(Clone)]
 pub struct AsyncSession {
-    session: Arc<crate::session::Session>,
+    session: Arc<Session>,
     read_state: ReadState,
 }
 
 impl std::ops::Deref for AsyncSession {
-    type Target = crate::session::Session;
+    type Target = Session;
 
     fn deref(&self) -> &Self::Target {
         &self.session
     }
 }
 
-impl From<Arc<crate::session::Session>> for AsyncSession {
-    fn from(session: Arc<crate::session::Session>) -> Self {
+impl From<Arc<Session>> for AsyncSession {
+    fn from(session: Arc<Session>) -> Self {
         Self {
             session,
             read_state: ReadState::Idle,
         }
-    }
-}
-
-impl Drop for AsyncSession {
-    fn drop(&mut self) {
-        self.session.shutdown().ok();
     }
 }
 
