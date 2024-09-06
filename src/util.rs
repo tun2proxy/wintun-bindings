@@ -25,7 +25,6 @@ use windows_sys::{
     },
 };
 
-#[doc(hidden)]
 pub fn get_wintun_bin_pattern_path() -> std::io::Result<std::path::PathBuf> {
     let dll_path = if cfg!(target_arch = "x86") {
         "wintun/bin/x86/wintun.dll"
@@ -352,7 +351,6 @@ fn MAKELANGID(p: u32, s: u32) -> u32 {
 }
 
 /// Returns a a human readable error message from a windows error code
-#[doc(hidden)]
 pub fn format_message(error_code: u32) -> Result<String, BoxError> {
     let buf: *mut u16 = std::ptr::null_mut();
 
@@ -407,7 +405,6 @@ pub(crate) fn set_adapter_mtu(name: &str, mtu: usize) -> std::io::Result<()> {
 }
 
 /// Runs a command and returns an error if the command fails, just convenience for users.
-#[doc(hidden)]
 pub fn run_command(command: &str, args: &[&str]) -> std::io::Result<Vec<u8>> {
     let out = std::process::Command::new(command).args(args).output()?;
     if !out.status.success() {
