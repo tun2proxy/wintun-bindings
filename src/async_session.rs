@@ -62,16 +62,22 @@ impl AsyncSession {
         loop {
             match self.session.try_receive() {
                 Ok(Some(packet)) => {
-                    // it seems to be standard practice to truncate rather than return an error,
-                    // in the context of TUN/TAP the packet lengths can be read anyway
-                    let size = packet.bytes.len().min(buf.len());
+                    let size = packet.bytes.len();
+                    if buf.len() < size {
+                        return Err(std::io::Error::new(std::io::ErrorKind::Other, "Buffer too small"));
+                    }
                     buf[..size].copy_from_slice(&packet.bytes[..size]);
                     return Ok(size);
                 }
                 Ok(None) => {
                     let read_event = self.session.get_read_wait_event()?;
                     let shutdown_event = self.session.shutdown_event.get_handle();
-                    blocking::unblock(move || Self::wait_for_read(read_event, shutdown_event)).await;
+                    match blocking::unblock(move || Self::wait_for_read(read_event, shutdown_event)).await {
+                        WaitingStopReason::Shutdown => {
+                            return Err(std::io::Error::new(std::io::ErrorKind::Other, "Shutdown"));
+                        }
+                        WaitingStopReason::Ready => continue,
+                    }
                 }
                 Err(err) => return Err(std::io::Error::new(std::io::ErrorKind::Other, err)),
             }
