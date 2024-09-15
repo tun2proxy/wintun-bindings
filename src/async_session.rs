@@ -74,7 +74,7 @@ impl AsyncSession {
                     let shutdown_event = self.session.shutdown_event.get_handle();
                     match blocking::unblock(move || Self::wait_for_read(read_event, shutdown_event)).await {
                         WaitingStopReason::Shutdown => {
-                            return Err(std::io::Error::new(std::io::ErrorKind::Other, "Shutdown"));
+                            return Err(crate::Error::ShuttingDown.into());
                         }
                         WaitingStopReason::Ready => continue,
                     }
