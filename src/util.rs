@@ -413,7 +413,7 @@ pub fn run_command(command: &str, args: &[&str]) -> std::io::Result<Vec<u8>> {
         } else {
             &out.stderr
         });
-        let info = format!("{} failed with: \"{}\"", command, err);
+        let info = format!("{} {} failed with: \"{}\"", command, args.join(" "), err);
         return Err(std::io::Error::new(std::io::ErrorKind::Other, info));
     }
     Ok(out.stdout)

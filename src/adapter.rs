@@ -14,7 +14,6 @@ use std::{
     ffi::OsStr,
     net::{IpAddr, Ipv4Addr},
     os::windows::prelude::OsStrExt,
-    process::Command,
     ptr,
     sync::Arc,
     sync::OnceLock,
@@ -256,23 +255,24 @@ impl Adapter {
         // Command line: `netsh interface ipv4 set address name="YOUR_INTERFACE_NAME" source=static address=IP_ADDRESS mask=SUBNET_MASK gateway=GATEWAY`
         // or shorter command: `netsh interface ipv4 set address name="YOUR_INTERFACE_NAME" static IP_ADDRESS SUBNET_MASK GATEWAY`
         // for example: `netsh interface ipv4 set address name="Wi-Fi" static 192.168.3.8 255.255.255.0 192.168.3.1`
-        let mut binding = Command::new("netsh");
-        let mut cmd = binding
-            .arg("interface")
-            .arg(if address.is_ipv4() { "ipv4" } else { "ipv6" })
-            .arg("set")
-            .arg("address")
-            .arg(format!("name=\"{}\"", name).as_str())
-            .arg("source=static")
-            .arg(format!("address={}", address).as_str())
-            .arg(format!("mask={}", mask).as_str());
+        let mut args: Vec<String> = vec![
+            "interface".into(),
+            if address.is_ipv4() {
+                "ipv4".into()
+            } else {
+                "ipv6".into()
+            },
+            "set".into(),
+            "address".into(),
+            format!("name=\"{}\"", name),
+            "source=static".into(),
+            format!("address={}", address),
+            format!("mask={}", mask),
+        ];
         if let Some(gateway) = gateway {
-            cmd = cmd.arg(format!("gateway={}", gateway).as_str());
+            args.push(format!("gateway={}", gateway));
         }
-        let out = cmd.output()?;
-        if !out.status.success() {
-            return Err(format!("Failed to set address: {}", String::from_utf8_lossy(&out.stderr)).into());
-        }
+        util::run_command("netsh", &args.iter().map(|s| s.as_str()).collect::<Vec<&str>>())?;
         Ok(())
     }
 
