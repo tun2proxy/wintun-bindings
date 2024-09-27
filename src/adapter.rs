@@ -252,7 +252,7 @@ impl Adapter {
         gateway: Option<IpAddr>,
     ) -> Result<(), Error> {
         let name = self.get_name()?;
-        // Command line: `netsh interface ipv4 set address name="YOUR_INTERFACE_NAME" source=static address=IP_ADDRESS mask=SUBNET_MASK gateway=GATEWAY`
+        // command line: `netsh interface ipv4 set address name="YOUR_INTERFACE_NAME" source=static address=IP_ADDRESS mask=SUBNET_MASK gateway=GATEWAY`
         // or shorter command: `netsh interface ipv4 set address name="YOUR_INTERFACE_NAME" static IP_ADDRESS SUBNET_MASK GATEWAY`
         // for example: `netsh interface ipv4 set address name="Wi-Fi" static 192.168.3.8 255.255.255.0 192.168.3.1`
         let mut args: Vec<String> = vec![
