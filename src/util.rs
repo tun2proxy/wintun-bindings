@@ -4,8 +4,8 @@ use windows_sys::{
     core::GUID,
     Win32::{
         Foundation::{
-            GetLastError, LocalFree, ERROR_BUFFER_OVERFLOW, ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS, NO_ERROR,
-            WIN32_ERROR,
+            GetLastError, LocalFree, ERROR_ADDRESS_NOT_ASSOCIATED, ERROR_BUFFER_OVERFLOW, ERROR_INSUFFICIENT_BUFFER,
+            ERROR_INVALID_PARAMETER, ERROR_NOT_ENOUGH_MEMORY, ERROR_NO_DATA, ERROR_SUCCESS, NO_ERROR, WIN32_ERROR,
         },
         NetworkManagement::{
             IpHelper::{
@@ -233,7 +233,7 @@ where
     let result = unsafe { GetAdaptersAddresses(family, flags, std::ptr::null_mut(), std::ptr::null_mut(), &mut size) };
 
     if result != ERROR_BUFFER_OVERFLOW {
-        return Err(format!("GetAdaptersAddresses failed: {}", format_message(result)?).into());
+        return Err(format!("GetAdaptersAddresses first attemp failed: {}", format_message(result)?).into());
     }
     // Allocate memory for the buffer
     let mut addresses: Vec<u8> = vec![0; (size + 4) as usize];
@@ -245,7 +245,16 @@ where
     };
 
     if ERROR_SUCCESS != result {
-        return Err(format!("GetAdaptersAddresses failed: {}", format_message(result)?).into());
+        let err_msg = match result {
+            ERROR_ADDRESS_NOT_ASSOCIATED => "ERROR_ADDRESS_NOT_ASSOCIATED".into(),
+            ERROR_BUFFER_OVERFLOW => "ERROR_BUFFER_OVERFLOW".into(),
+            ERROR_INVALID_PARAMETER => "ERROR_INVALID_PARAMETER".into(),
+            ERROR_NOT_ENOUGH_MEMORY => "ERROR_NOT_ENOUGH_MEMORY".into(),
+            ERROR_NO_DATA => "ERROR_NO_DATA".into(),
+            _ => format_message(result)?,
+        };
+
+        return Err(format!("GetAdaptersAddresses second attemp failed: {err_msg}").into());
     }
 
     // If successful, output some information from the data we received
