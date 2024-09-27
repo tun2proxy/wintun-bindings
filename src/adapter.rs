@@ -237,9 +237,9 @@ impl Adapter {
     /// Sets the DNS servers for this adapter
     pub fn set_dns_servers(&self, dns_servers: &[IpAddr]) -> Result<(), Error> {
         let interface = GUID::from_u128(self.get_guid());
-        if let Err(err) = util::set_interface_dns_servers(interface, dns_servers) {
-            log::error!("Failed to set DNS servers in first attempt: {}", err);
-            util::set_adapter_dns_servers(&self.get_name()?, dns_servers)?;
+        if let Err(e) = util::set_interface_dns_servers(interface, dns_servers) {
+            log::debug!("Failed to set DNS servers in first attempt: \"{}\", try another...", e);
+            util::set_interface_dns_servers_via_cmd(&self.get_name()?, dns_servers)?;
         }
         Ok(())
     }

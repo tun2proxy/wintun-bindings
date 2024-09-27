@@ -157,7 +157,7 @@ pub(crate) fn set_interface_dns_servers(interface: GUID, dns: &[IpAddr]) -> crat
     }
 }
 
-pub(crate) fn set_adapter_dns_servers(adapter: &str, dns: &[IpAddr]) -> crate::Result<()> {
+pub(crate) fn set_interface_dns_servers_via_cmd(adapter: &str, dns: &[IpAddr]) -> crate::Result<()> {
     if dns.is_empty() {
         return Ok(());
     }
