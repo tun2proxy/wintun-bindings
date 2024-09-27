@@ -43,6 +43,18 @@ pub fn get_wintun_bin_pattern_path() -> std::io::Result<std::path::PathBuf> {
     Ok(dll_path.into())
 }
 
+//
+// WINAPI VOID RtlGetNtVersionNumbers (DWORD *MajorVersion, DWORD *MinorVersion, DWORD *BuildNumber);
+//
+pub(crate) fn get_windows_version() -> Result<(u32, u32, u32), libloading::Error> {
+    let library = unsafe { ::libloading::Library::new("ntdll")? };
+    type TheFn = unsafe extern "system" fn(*mut u32, *mut u32, *mut u32);
+    let func: TheFn = unsafe { library.get(b"RtlGetNtVersionNumbers\0").map(|sym| *sym)? };
+    let (mut major, mut minor, mut build) = (0, 0, 0);
+    unsafe { func(&mut major, &mut minor, &mut build) };
+    Ok((major, minor, build))
+}
+
 pub(crate) const fn win_guid_to_u128(guid: &GUID) -> u128 {
     let data4_u64 = u64::from_be_bytes(guid.data4);
     ((guid.data1 as u128) << 96) | ((guid.data2 as u128) << 80) | ((guid.data3 as u128) << 64) | (data4_u64 as u128)

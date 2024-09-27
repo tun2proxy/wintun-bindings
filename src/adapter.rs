@@ -69,7 +69,7 @@ impl Adapter {
         let name_utf16: Vec<_> = name.encode_utf16().chain(std::iter::once(0)).collect();
         let tunnel_type_utf16: Vec<u16> = tunnel_type.encode_utf16().chain(std::iter::once(0)).collect();
 
-        let guid = match guid {
+        let mut guid = match guid {
             Some(guid) => guid,
             None => {
                 let mut guid: GUID = unsafe { std::mem::zeroed() };
@@ -88,6 +88,14 @@ impl Adapter {
         }
         let luid = crate::ffi::alias_to_luid(name)?;
         let index = crate::ffi::luid_to_index(&luid)?;
+        let real_guid = util::win_guid_to_u128(&crate::ffi::luid_to_guid(&luid)?);
+        if guid != real_guid {
+            let real_guid_s = util::guid_to_win_style_string(&GUID::from_u128(real_guid))?;
+            let guid_s = util::guid_to_win_style_string(&GUID::from_u128(guid))?;
+            let (major, minor, build) = util::get_windows_version()?;
+            log::warn!("Windows {major}.{minor}.{build} internal bug cause the GUID mismatch: Expected {guid_s}, got {real_guid_s}");
+            guid = real_guid;
+        }
         Ok(Arc::new(Adapter {
             adapter: UnsafeHandle(result),
             wintun: wintun.clone(),
