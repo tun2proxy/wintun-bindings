@@ -4,7 +4,7 @@ static RUNNING: AtomicBool = AtomicBool::new(true);
 
 fn main() -> Result<(), wintun_bindings::BoxError> {
     dotenvy::dotenv().ok();
-    env_logger::init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
     let dll_path = wintun_bindings::get_wintun_bin_pattern_path()?;
     let wintun = unsafe { wintun_bindings::load_from_path(dll_path)? };
 
