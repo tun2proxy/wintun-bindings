@@ -1,50 +1,19 @@
-use std::ffi::CString;
-use windows_sys::{
-    core::PCSTR,
-    Win32::{
-        Foundation::{FreeLibrary, FARPROC, HMODULE},
-        System::LibraryLoader::{GetProcAddress, LoadLibraryA},
-    },
-};
-
-pub trait FnCast: Sized {
-    unsafe fn from_untyped(f: unsafe extern "system" fn() -> isize) -> Self;
-}
+pub trait FnCast: Sized + Copy {}
 
 pub struct FnHolder<F: FnCast> {
-    lib: HMODULE,
+    _lib: ::libloading::Library,
     pub func: F,
 }
 
 unsafe impl<F: FnCast> Send for FnHolder<F> {}
 unsafe impl<F: FnCast> Sync for FnHolder<F> {}
 
-impl<F: FnCast> Drop for FnHolder<F> {
-    fn drop(&mut self) {
-        if !self.lib.is_null() {
-            unsafe { FreeLibrary(self.lib) };
-        }
-    }
-}
-
 pub fn load_function<F: FnCast>(module_name: &str, function_name: &str) -> Option<FnHolder<F>> {
     unsafe {
-        let module_name_cstr = CString::new(module_name).ok()?;
-        let function_name_cstr = CString::new(function_name).ok()?;
-
-        let lib = LoadLibraryA(module_name_cstr.as_ptr() as PCSTR);
-        if lib.is_null() {
-            return None;
-        }
-
-        let func_opt: FARPROC = GetProcAddress(lib, function_name_cstr.as_ptr() as PCSTR);
-        let Some(func0) = func_opt else {
-            FreeLibrary(lib);
-            return None;
-        };
-        let func = F::from_untyped(func0);
-
-        Some(FnHolder { lib, func })
+        let function_name_cstr = std::ffi::CString::new(function_name).ok()?;
+        let _lib = ::libloading::Library::new(module_name).ok()?;
+        let func: F = _lib.get(function_name_cstr.to_bytes()).map(|sym| *sym).ok()?;
+        Some(FnHolder { _lib, func })
     }
 }
 
@@ -53,11 +22,7 @@ macro_rules! define_fn_dynamic_load {
     ($fn_type:ident, $fn_signature:ty, $static_var:ident, $load_fn:ident, $module_name:expr, $fn_name:expr) => {
         pub type $fn_type = $fn_signature;
 
-        impl $crate::fn_holder::FnCast for $fn_type {
-            unsafe fn from_untyped(f: unsafe extern "system" fn() -> isize) -> Self {
-                std::mem::transmute(f)
-            }
-        }
+        impl $crate::fn_holder::FnCast for $fn_type {}
 
         #[allow(non_upper_case_globals)]
         static $static_var: std::sync::OnceLock<Option<$crate::fn_holder::FnHolder<$fn_type>>> =
@@ -83,5 +48,5 @@ define_fn_dynamic_load!(
     "bcryptprimitives.dll",
     "ProcessPrng"
 );
-let func = get_fn_process_prng().ok_or("Failed to load function SetInterfaceDnsSettings")?;
+let func = get_fn_process_prng().ok_or("Failed to load function ProcessPrng")?;
 */
