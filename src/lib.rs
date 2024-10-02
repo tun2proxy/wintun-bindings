@@ -6,6 +6,7 @@ mod adapter;
 mod async_session;
 mod error;
 mod ffi;
+mod fn_holder;
 mod handle;
 mod log;
 mod packet;

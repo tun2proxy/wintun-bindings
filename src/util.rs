@@ -138,7 +138,18 @@ pub fn get_active_network_interface_gateways() -> std::io::Result<Vec<IpAddr>> {
     Ok(addrs)
 }
 
+crate::define_fn_dynamic_load!(
+    SetInterfaceDnsSettingsFn,
+    unsafe extern "system" fn(GUID, *const DNS_INTERFACE_SETTINGS) -> WIN32_ERROR,
+    g_SetInterfaceDnsSettings,
+    get_set_interface_dns_settings_fn,
+    "iphlpapi.dll",
+    "SetInterfaceDnsSettings"
+);
+
 pub(crate) fn set_interface_dns_servers(interface: GUID, dns: &[IpAddr]) -> crate::Result<()> {
+    let func = get_set_interface_dns_settings_fn().ok_or("Failed to load function SetInterfaceDnsSettings")?;
+
     // format L"1.1.1.1,8.8.8.8", or L"1.1.1.1 8.8.8.8".
     let dns = dns.iter().map(|ip| ip.to_string()).collect::<Vec<_>>().join(",");
     let dns = dns.encode_utf16().chain(std::iter::once(0)).collect::<Vec<_>>();
@@ -159,10 +170,6 @@ pub(crate) fn set_interface_dns_servers(interface: GUID, dns: &[IpAddr]) -> crat
     // The SetInterfaceDnsSettings function was first introduced in Windows 10,
     // to compatible with Windows 7, we use the dynamic loading method to call the function.
     // unsafe { SetInterfaceDnsSettings(interface, &settings as *const _) }
-
-    type TheFn = unsafe extern "system" fn(interface: GUID, settings: *const DNS_INTERFACE_SETTINGS) -> WIN32_ERROR;
-    let library = unsafe { ::libloading::Library::new("iphlpapi.dll")? };
-    let func: TheFn = unsafe { library.get(b"SetInterfaceDnsSettings\0").map(|sym| *sym)? };
     match unsafe { func(interface, &settings as *const _) } {
         0 => Ok(()),
         e => Err(std::io::Error::from_raw_os_error(e as i32).into()),
