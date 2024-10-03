@@ -12,7 +12,7 @@ pub fn load_function<F: FnCast>(module_name: &str, function_name: &str) -> Optio
     unsafe {
         let function_name_cstr = std::ffi::CString::new(function_name).ok()?;
         let _lib = ::libloading::Library::new(module_name).ok()?;
-        let func: F = _lib.get(function_name_cstr.to_bytes()).map(|sym| *sym).ok()?;
+        let func: F = _lib.get(function_name_cstr.to_bytes_with_nul()).map(|sym| *sym).ok()?;
         Some(FnHolder { _lib, func })
     }
 }
