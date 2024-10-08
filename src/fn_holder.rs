@@ -1,4 +1,4 @@
-pub trait FnCast: Sized + Copy {}
+pub trait FnCast: Copy {}
 
 pub struct FnHolder<F: FnCast> {
     _lib: ::libloading::Library,
@@ -28,6 +28,7 @@ macro_rules! define_fn_dynamic_load {
         static $static_var: std::sync::OnceLock<Option<$crate::fn_holder::FnHolder<$fn_type>>> =
             std::sync::OnceLock::new();
 
+        #[allow(non_snake_case)]
         pub fn $load_fn() -> Option<$fn_type> {
             $static_var
                 .get_or_init(|| $crate::fn_holder::load_function($module_name, $fn_name))
@@ -41,12 +42,12 @@ macro_rules! define_fn_dynamic_load {
 // usage
 use windows_sys::Win32::Foundation::BOOL;
 define_fn_dynamic_load!(
-    ProcessPrngFn,
+    ProcessPrngDeclear,
     unsafe extern "system" fn(pbdata: *mut u8, cbdata: usize) -> BOOL,
     PROCESS_PRNG,
-    get_fn_process_prng,
+    ProcessPrng,
     "bcryptprimitives.dll",
     "ProcessPrng"
 );
-let func = get_fn_process_prng().ok_or("Failed to load function ProcessPrng")?;
+let func = ProcessPrng().ok_or("Failed to load function ProcessPrng")?;
 */

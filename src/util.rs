@@ -46,10 +46,17 @@ pub fn get_wintun_bin_pattern_path() -> std::io::Result<std::path::PathBuf> {
 //
 // WINAPI VOID RtlGetNtVersionNumbers (DWORD *MajorVersion, DWORD *MinorVersion, DWORD *BuildNumber);
 //
-pub(crate) fn get_windows_version() -> Result<(u32, u32, u32), libloading::Error> {
-    let library = unsafe { ::libloading::Library::new("ntdll")? };
-    type TheFn = unsafe extern "system" fn(*mut u32, *mut u32, *mut u32);
-    let func: TheFn = unsafe { library.get(b"RtlGetNtVersionNumbers\0").map(|sym| *sym)? };
+crate::define_fn_dynamic_load!(
+    RtlGetNtVersionNumbersDeclare,
+    unsafe extern "system" fn(*mut u32, *mut u32, *mut u32),
+    RTL_GET_NT_VERSION_NUMBERS,
+    RtlGetNtVersionNumbers,
+    "ntdll",
+    "RtlGetNtVersionNumbers"
+);
+
+pub(crate) fn get_windows_version() -> Result<(u32, u32, u32), Error> {
+    let func = RtlGetNtVersionNumbers().ok_or("Failed to load function RtlGetNtVersionNumbers")?;
     let (mut major, mut minor, mut build) = (0, 0, 0);
     unsafe { func(&mut major, &mut minor, &mut build) };
     Ok((major, minor, build))
@@ -139,16 +146,16 @@ pub fn get_active_network_interface_gateways() -> std::io::Result<Vec<IpAddr>> {
 }
 
 crate::define_fn_dynamic_load!(
-    SetInterfaceDnsSettingsFn,
+    SetInterfaceDnsSettingsDeclare,
     unsafe extern "system" fn(GUID, *const DNS_INTERFACE_SETTINGS) -> WIN32_ERROR,
-    g_SetInterfaceDnsSettings,
-    get_set_interface_dns_settings_fn,
+    SET_INTERFACE_DNS_SETTINGS,
+    SetInterfaceDnsSettings,
     "iphlpapi.dll",
     "SetInterfaceDnsSettings"
 );
 
 pub(crate) fn set_interface_dns_servers(interface: GUID, dns: &[IpAddr]) -> crate::Result<()> {
-    let func = get_set_interface_dns_settings_fn().ok_or("Failed to load function SetInterfaceDnsSettings")?;
+    let func = SetInterfaceDnsSettings().ok_or("Failed to load function SetInterfaceDnsSettings")?;
 
     // format L"1.1.1.1,8.8.8.8", or L"1.1.1.1 8.8.8.8".
     let dns = dns.iter().map(|ip| ip.to_string()).collect::<Vec<_>>().join(",");
