@@ -86,23 +86,32 @@ impl Adapter {
         if result.is_null() {
             return Err("Failed to create adapter".into());
         }
-        let luid = crate::ffi::alias_to_luid(name)?;
-        let index = crate::ffi::luid_to_index(&luid)?;
-        let real_guid = util::win_guid_to_u128(&crate::ffi::luid_to_guid(&luid)?);
-        if guid != real_guid {
-            let real_guid_s = util::guid_to_win_style_string(&GUID::from_u128(real_guid))?;
-            let guid_s = util::guid_to_win_style_string(&GUID::from_u128(guid))?;
-            let (major, minor, build) = util::get_windows_version()?;
-            log::warn!("Windows {major}.{minor}.{build} internal bug cause the GUID mismatch: Expected {guid_s}, got {real_guid_s}");
-            guid = real_guid;
+        let mut call = || -> Result<Arc<Adapter>, Error> {
+            let luid = crate::ffi::alias_to_luid(name)?;
+            let index = crate::ffi::luid_to_index(&luid)?;
+            let real_guid = util::win_guid_to_u128(&crate::ffi::luid_to_guid(&luid)?);
+            if guid != real_guid {
+                let real_guid_s = util::guid_to_win_style_string(&GUID::from_u128(real_guid))?;
+                let guid_s = util::guid_to_win_style_string(&GUID::from_u128(guid))?;
+                let (major, minor, build) = util::get_windows_version()?;
+                log::warn!("Windows {major}.{minor}.{build} internal bug cause the GUID mismatch: Expected {guid_s}, got {real_guid_s}");
+                guid = real_guid;
+            }
+            Ok(Arc::new(Adapter {
+                adapter: UnsafeHandle(result),
+                wintun: wintun.clone(),
+                guid,
+                index,
+                luid,
+            }))
+        };
+        match call() {
+            Ok(adapter) => Ok(adapter),
+            Err(e) => {
+                unsafe { wintun.WintunCloseAdapter(result) };
+                Err(e)
+            }
         }
-        Ok(Arc::new(Adapter {
-            adapter: UnsafeHandle(result),
-            wintun: wintun.clone(),
-            guid,
-            index,
-            luid,
-        }))
     }
 
     /// Attempts to open an existing wintun interface name `name`.
@@ -116,17 +125,26 @@ impl Adapter {
         if result.is_null() {
             return Err("WintunOpenAdapter failed".into());
         }
-        let luid = crate::ffi::alias_to_luid(name)?;
-        let index = crate::ffi::luid_to_index(&luid)?;
-        let guid = crate::ffi::luid_to_guid(&luid)?;
-        let guid = util::win_guid_to_u128(&guid);
-        Ok(Arc::new(Adapter {
-            adapter: UnsafeHandle(result),
-            wintun: wintun.clone(),
-            guid,
-            index,
-            luid,
-        }))
+        let call = || -> Result<Arc<Adapter>, Error> {
+            let luid = crate::ffi::alias_to_luid(name)?;
+            let index = crate::ffi::luid_to_index(&luid)?;
+            let guid = crate::ffi::luid_to_guid(&luid)?;
+            let guid = util::win_guid_to_u128(&guid);
+            Ok(Arc::new(Adapter {
+                adapter: UnsafeHandle(result),
+                wintun: wintun.clone(),
+                guid,
+                index,
+                luid,
+            }))
+        };
+        match call() {
+            Ok(adapter) => Ok(adapter),
+            Err(e) => {
+                unsafe { wintun.WintunCloseAdapter(result) };
+                Err(e)
+            }
+        }
     }
 
     /// Delete an adapter, consuming it in the process
