@@ -37,7 +37,7 @@ c2rust-bitfields = "0.19"
 futures = { version = "0.3", optional = true }
 libloading = "0.8"
 log = "0.4"
-thiserror = "1"
+thiserror = "2"
 windows-sys = { version = "0.59", features = [
     "Win32_System_Diagnostics_Debug",
     "Win32_System_SystemServices",

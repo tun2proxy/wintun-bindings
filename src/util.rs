@@ -1,4 +1,4 @@
-use crate::{BoxError, Error};
+use crate::Error;
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use windows_sys::{
     core::GUID,
@@ -9,10 +9,11 @@ use windows_sys::{
         },
         NetworkManagement::{
             IpHelper::{
-                FreeMibTable, GetAdaptersAddresses, GetIfTable2, GetInterfaceInfo, DNS_INTERFACE_SETTINGS,
-                DNS_INTERFACE_SETTINGS_VERSION1, DNS_SETTING_NAMESERVER, GAA_FLAG_INCLUDE_GATEWAYS,
-                GAA_FLAG_INCLUDE_PREFIX, IF_TYPE_ETHERNET_CSMACD, IF_TYPE_IEEE80211, IP_ADAPTER_ADDRESSES_LH,
-                IP_ADAPTER_INDEX_MAP, IP_INTERFACE_INFO, MIB_IF_ROW2, MIB_IF_TABLE2,
+                FreeMibTable, GetAdaptersAddresses, GetIfEntry, GetIfTable2, GetInterfaceInfo, SetIfEntry,
+                DNS_INTERFACE_SETTINGS, DNS_INTERFACE_SETTINGS_VERSION1, DNS_SETTING_NAMESERVER,
+                GAA_FLAG_INCLUDE_GATEWAYS, GAA_FLAG_INCLUDE_PREFIX, IF_TYPE_ETHERNET_CSMACD, IF_TYPE_IEEE80211,
+                IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_INDEX_MAP, IP_INTERFACE_INFO, MIB_IFROW, MIB_IF_ROW2,
+                MIB_IF_TABLE2,
             },
             Ndis::{IfOperStatusUp, NET_LUID_LH},
         },
@@ -386,7 +387,7 @@ fn MAKELANGID(p: u32, s: u32) -> u32 {
 }
 
 /// Returns a a human readable error message from a windows error code
-pub fn format_message(error_code: u32) -> Result<String, BoxError> {
+pub fn format_message(error_code: u32) -> std::io::Result<String> {
     let buf: *mut u16 = std::ptr::null_mut();
 
     let chars_written = unsafe {
@@ -401,7 +402,7 @@ pub fn format_message(error_code: u32) -> Result<String, BoxError> {
         )
     };
     if chars_written == 0 {
-        return Ok(get_last_error()?);
+        return get_last_error();
     }
     let result = unsafe { win_pwstr_to_string(buf)? };
     // Win32 returns the same handle if LocalFree fails.
@@ -425,17 +426,23 @@ pub(crate) fn get_os_error_from_id(id: i32) -> std::io::Result<()> {
 }
 
 pub(crate) fn set_adapter_mtu(name: &str, mtu: usize) -> std::io::Result<()> {
-    // command line: `netsh interface ipv4 set subinterface "MyAdapter" mtu=1500 store=persistent`
-    let args = &[
-        "interface",
-        "ipv4",
-        "set",
-        "subinterface",
-        &format!("\"{}\"", name),
-        &format!("mtu={}", mtu),
-        "store=persistent",
-    ];
-    run_command("netsh", args)?;
+    let luid = crate::ffi::alias_to_luid(name)?;
+    let index = crate::ffi::luid_to_index(&luid)?;
+
+    let mut row: MIB_IFROW = unsafe { std::mem::zeroed() };
+    row.dwIndex = index;
+
+    let v0 = unsafe { GetIfEntry(&mut row) };
+    if v0 != NO_ERROR {
+        let info = format_message(v0)?;
+        return Err(std::io::Error::new(std::io::ErrorKind::Other, info));
+    }
+    row.dwMtu = mtu as u32;
+    let v2 = unsafe { SetIfEntry(&row) };
+    if v2 != NO_ERROR {
+        let info = format_message(v2)?;
+        return Err(std::io::Error::new(std::io::ErrorKind::Other, info));
+    }
     Ok(())
 }
 
