@@ -42,7 +42,7 @@ macro_rules! define_fn_dynamic_load {
 // usage
 use windows_sys::Win32::Foundation::BOOL;
 define_fn_dynamic_load!(
-    ProcessPrngDeclear,
+    ProcessPrngDeclare,
     unsafe extern "system" fn(pbdata: *mut u8, cbdata: usize) -> BOOL,
     PROCESS_PRNG,
     ProcessPrng,

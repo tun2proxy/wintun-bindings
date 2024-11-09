@@ -52,7 +52,10 @@ fn main() -> Result<(), BoxError> {
     dotenvy::dotenv().ok();
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init();
     // Loading wintun
-    let dll_path = get_wintun_bin_pattern_path()?;
+    let mut dll_path = get_wintun_bin_pattern_path()?;
+    if !std::fs::exists(&dll_path)? {
+        dll_path = "wintun.dll".into();
+    }
     let wintun = unsafe { load_from_path(dll_path)? };
 
     let version = get_running_driver_version(&wintun);
