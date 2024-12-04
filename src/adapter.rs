@@ -430,18 +430,12 @@ pub(crate) fn delete_adapter_info_from_reg(dev_name: &str) -> std::io::Result<()
             Ok(profile_name) => {
                 if dev_name == profile_name {
                     match profiles_key.delete_subkey_all(&sub_key_name) {
-                        Ok(_) => {
-                            log::info!("Successfully deleted Profiles sub_key: {}", sub_key_name)
-                        }
-                        Err(e) => {
-                            log::warn!("Failed to delete Profiles sub_key {}: {}", sub_key_name, e)
-                        }
+                        Ok(_) => log::info!("Successfully deleted Profiles sub_key: {}", sub_key_name),
+                        Err(e) => log::warn!("Failed to delete Profiles sub_key {}: {}", sub_key_name, e),
                     }
                 }
             }
-            Err(e) => {
-                log::warn!("Failed to read ProfileName for sub_key {}: {}", sub_key_name, e);
-            }
+            Err(e) => log::warn!("Failed to read ProfileName for sub_key {}: {}", sub_key_name, e),
         }
     }
     let unmanaged_key = hklm.open_subkey_with_flags(
@@ -454,18 +448,12 @@ pub(crate) fn delete_adapter_info_from_reg(dev_name: &str) -> std::io::Result<()
             Ok(description) => {
                 if dev_name == description {
                     match unmanaged_key.delete_subkey_all(&sub_key_name) {
-                        Ok(_) => {
-                            log::info!("Successfully deleted Unmanaged sub_key: {}", sub_key_name)
-                        }
-                        Err(e) => {
-                            log::warn!("Failed to delete Unmanaged sub_key {}: {}", sub_key_name, e)
-                        }
+                        Ok(_) => log::info!("Successfully deleted Unmanaged sub_key: {}", sub_key_name),
+                        Err(e) => log::warn!("Failed to delete Unmanaged sub_key {}: {}", sub_key_name, e),
                     }
                 }
             }
-            Err(e) => {
-                log::warn!("Failed to read Description for sub_key {}: {}", sub_key_name, e);
-            }
+            Err(e) => log::warn!("Failed to read Description for sub_key {}: {}", sub_key_name, e),
         }
     }
     Ok(())
