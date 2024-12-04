@@ -410,11 +410,13 @@ impl Drop for Adapter {
         self.adapter = UnsafeHandle(ptr::null_mut());
         if let Ok(name) = name {
             // Delete registry related to network card
-            _ = delete_reg(&name);
+            _ = delete_adapter_info_from_reg(&name);
         }
     }
 }
-pub fn delete_reg(dev_name: &str) -> std::io::Result<()> {
+
+/// This function is used to avoid the adapter name and guid being recorded in the registry
+pub(crate) fn delete_adapter_info_from_reg(dev_name: &str) -> std::io::Result<()> {
     use winreg::{enums::HKEY_LOCAL_MACHINE, enums::KEY_ALL_ACCESS, RegKey};
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
     let profiles_key = hklm.open_subkey_with_flags(
