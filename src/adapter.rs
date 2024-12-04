@@ -182,7 +182,7 @@ impl Adapter {
         // Manual reset, because we use this event once and it must fire on all threads
         let shutdown_event = SafeEvent::new(true, false)?;
         Ok(Arc::new(Session {
-            session: UnsafeHandle(result),
+            inner: UnsafeHandle(result),
             read_event: OnceLock::new(),
             shutdown_event: Arc::new(shutdown_event),
             adapter: self.clone(),

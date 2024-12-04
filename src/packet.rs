@@ -68,7 +68,7 @@ impl Drop for Packet {
                     //     memory back to wintun here
                     self.session
                         .get_wintun()
-                        .WintunReleaseReceivePacket(self.session.session.0, self.bytes.as_ptr())
+                        .WintunReleaseReceivePacket(self.session.inner.0, self.bytes.as_ptr())
                 };
             }
             Kind::SendPacketPending => {

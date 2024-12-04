@@ -11,7 +11,7 @@ use windows_sys::Win32::{
 /// Wrapper around a <https://git.zx2c4.com/wintun/about/#wintun_session_handle>
 pub struct Session {
     /// The session handle given to us by WintunStartSession
-    pub(crate) session: UnsafeHandle<wintun_raw::WINTUN_SESSION_HANDLE>,
+    pub(crate) inner: UnsafeHandle<wintun_raw::WINTUN_SESSION_HANDLE>,
 
     /// Windows event handle that is signaled by the wintun driver when data becomes available to
     /// read
@@ -43,7 +43,7 @@ impl Session {
     /// to shutdown with allocated packets that have not yet been sent
     pub fn allocate_send_packet(self: &Arc<Self>, size: u16) -> Result<packet::Packet, Error> {
         let wintun = self.get_wintun();
-        let ptr = unsafe { wintun.WintunAllocateSendPacket(self.session.0, size as u32) };
+        let ptr = unsafe { wintun.WintunAllocateSendPacket(self.inner.0, size as u32) };
         if ptr.is_null() {
             return Err(util::get_last_error()?.into());
         }
@@ -61,7 +61,7 @@ impl Session {
         assert!(matches!(packet.kind, packet::Kind::SendPacketPending));
 
         let wintun = self.get_wintun();
-        unsafe { wintun.WintunSendPacket(self.session.0, packet.bytes.as_ptr()) };
+        unsafe { wintun.WintunSendPacket(self.inner.0, packet.bytes.as_ptr()) };
         //Mark the packet at sent
         packet.kind = packet::Kind::SendPacketSent;
     }
@@ -73,7 +73,7 @@ impl Session {
         let mut size = 0u32;
 
         let wintun = self.get_wintun();
-        let ptr = unsafe { wintun.WintunReceivePacket(self.session.0, &mut size as *mut u32) };
+        let ptr = unsafe { wintun.WintunReceivePacket(self.inner.0, &mut size as *mut u32) };
 
         debug_assert!(size <= u16::MAX as u32);
         if ptr.is_null() {
@@ -99,7 +99,7 @@ impl Session {
         let wintun = self.get_wintun();
         Ok(*self
             .read_event
-            .get_or_init(|| UnsafeHandle(unsafe { wintun.WintunGetReadWaitEvent(self.session.0) })))
+            .get_or_init(|| UnsafeHandle(unsafe { wintun.WintunGetReadWaitEvent(self.inner.0) })))
     }
 
     /// Blocks until a packet is available, returning the next packet in the receive queue once this happens.
@@ -161,7 +161,7 @@ impl Session {
         let mut size = 0u32;
 
         let wintun = &self.adapter.wintun;
-        let ptr = unsafe { wintun.WintunReceivePacket(self.session.0, &mut size as *mut u32) };
+        let ptr = unsafe { wintun.WintunReceivePacket(self.inner.0, &mut size as *mut u32) };
 
         debug_assert!(size <= u16::MAX as u32);
         if ptr.is_null() {
@@ -206,12 +206,12 @@ impl Session {
     pub fn send(&self, buf: &[u8]) -> std::io::Result<usize> {
         let wintun = &self.adapter.wintun;
         let size = buf.len();
-        let ptr = unsafe { wintun.WintunAllocateSendPacket(self.session.0, size as u32) };
+        let ptr = unsafe { wintun.WintunAllocateSendPacket(self.inner.0, size as u32) };
         if ptr.is_null() {
             util::get_last_error()?;
         }
         unsafe { ptr::copy_nonoverlapping(buf.as_ptr(), ptr, size) };
-        unsafe { wintun.WintunSendPacket(self.session.0, ptr) };
+        unsafe { wintun.WintunSendPacket(self.inner.0, ptr) };
         Ok(buf.len())
     }
 }
@@ -221,7 +221,7 @@ impl Drop for Session {
         if let Err(e) = self.shutdown() {
             log::trace!("Failed to shutdown session: {}", e);
         }
-        unsafe { self.get_wintun().WintunEndSession(self.session.0) };
-        self.session.0 = ptr::null_mut();
+        unsafe { self.get_wintun().WintunEndSession(self.inner.0) };
+        self.inner.0 = ptr::null_mut();
     }
 }
