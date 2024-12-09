@@ -112,9 +112,9 @@ fn main() -> Result<(), BoxError> {
 
     // adapter.set_address("10.28.13.2".parse()?)?;
 
+    adapter.set_mtu(1400)?;
     let mtu = adapter.get_mtu()?;
     println!("adapter mtu: {}", mtu);
-    adapter.set_mtu(mtu)?;
 
     println!(
         "active adapter gateways: {:?}",

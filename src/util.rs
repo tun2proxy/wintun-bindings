@@ -9,11 +9,10 @@ use windows_sys::{
         },
         NetworkManagement::{
             IpHelper::{
-                FreeMibTable, GetAdaptersAddresses, GetIfEntry, GetIfTable2, GetInterfaceInfo, SetIfEntry,
-                DNS_INTERFACE_SETTINGS, DNS_INTERFACE_SETTINGS_VERSION1, DNS_SETTING_NAMESERVER,
-                GAA_FLAG_INCLUDE_GATEWAYS, GAA_FLAG_INCLUDE_PREFIX, IF_TYPE_ETHERNET_CSMACD, IF_TYPE_IEEE80211,
-                IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_INDEX_MAP, IP_INTERFACE_INFO, MIB_IFROW, MIB_IF_ROW2,
-                MIB_IF_TABLE2,
+                FreeMibTable, GetAdaptersAddresses, GetIfTable2, GetInterfaceInfo, DNS_INTERFACE_SETTINGS,
+                DNS_INTERFACE_SETTINGS_VERSION1, DNS_SETTING_NAMESERVER, GAA_FLAG_INCLUDE_GATEWAYS,
+                GAA_FLAG_INCLUDE_PREFIX, IF_TYPE_ETHERNET_CSMACD, IF_TYPE_IEEE80211, IP_ADAPTER_ADDRESSES_LH,
+                IP_ADAPTER_INDEX_MAP, IP_INTERFACE_INFO, MIB_IF_ROW2, MIB_IF_TABLE2,
             },
             Ndis::{IfOperStatusUp, NET_LUID_LH},
         },
@@ -426,22 +425,19 @@ pub(crate) fn get_os_error_from_id(id: i32) -> std::io::Result<()> {
 }
 
 pub(crate) fn set_adapter_mtu(name: &str, mtu: usize) -> std::io::Result<()> {
-    let luid = crate::ffi::alias_to_luid(name)?;
-    let index = crate::ffi::luid_to_index(&luid)?;
-
-    let mut row: MIB_IFROW = unsafe { std::mem::zeroed() };
-    row.dwIndex = index;
-
-    let v0 = unsafe { GetIfEntry(&mut row) };
-    if v0 != NO_ERROR {
-        let info = format_message(v0)?;
-        return Err(std::io::Error::new(std::io::ErrorKind::Other, info));
-    }
-    row.dwMtu = mtu as u32;
-    let v2 = unsafe { SetIfEntry(&row) };
-    if v2 != NO_ERROR {
-        let info = format_message(v2)?;
-        return Err(std::io::Error::new(std::io::ErrorKind::Other, info));
+    // command line: `netsh interface ipv4 set subinterface "MyAdapter" mtu=1500 store=persistent`
+    let args = &[
+        "interface",
+        "ipv4",
+        "set",
+        "subinterface",
+        &format!("\"{}\"", name),
+        &format!("mtu={}", mtu),
+        "store=persistent",
+    ];
+    if let Err(e) = run_command("netsh", args) {
+        log::error!("Failed to set MTU for adapter: {}", e);
+        return Err(e);
     }
     Ok(())
 }
