@@ -35,7 +35,7 @@ pub use crate::{
     util::get_active_network_interface_gateways,
 };
 #[doc(hidden)]
-pub use util::{format_message, get_wintun_bin_pattern_path, run_command};
+pub use util::{format_message, get_wintun_bin_pattern_path, run_command, set_adapter_mtu};
 
 pub use windows_sys::Win32::{Foundation::HANDLE, NetworkManagement::Ndis::NET_LUID_LH};
 

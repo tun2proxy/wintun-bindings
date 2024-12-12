@@ -424,8 +424,8 @@ pub(crate) fn get_os_error_from_id(id: i32) -> std::io::Result<()> {
     }
 }
 
-pub(crate) fn set_adapter_mtu(name: &str, mtu: usize) -> std::io::Result<()> {
-    // command line: `netsh interface ipv4 set subinterface "MyAdapter" mtu=1500 store=persistent`
+pub fn set_adapter_mtu(name: &str, mtu: usize) -> std::io::Result<()> {
+    // command line: `netsh interface ipv4 set subinterface "MyAdapter" mtu=1500`
     let args = &[
         "interface",
         "ipv4",
@@ -433,11 +433,33 @@ pub(crate) fn set_adapter_mtu(name: &str, mtu: usize) -> std::io::Result<()> {
         "subinterface",
         &format!("\"{}\"", name),
         &format!("mtu={}", mtu),
-        "store=persistent",
     ];
     if let Err(e) = run_command("netsh", args) {
         log::error!("Failed to set MTU for adapter: {}", e);
-        return Err(e);
+        set_adapter_mtu_2(name, mtu)?;
+    }
+    Ok(())
+}
+
+/// FIXME: This function perhapes is not working as expected, so don't use it for now.
+pub fn set_adapter_mtu_2(name: &str, mtu: usize) -> std::io::Result<()> {
+    use windows_sys::Win32::NetworkManagement::IpHelper::{GetIfEntry, SetIfEntry, MIB_IFROW};
+    let luid = crate::ffi::alias_to_luid(name)?;
+    let index = crate::ffi::luid_to_index(&luid)?;
+
+    let mut row: MIB_IFROW = unsafe { std::mem::zeroed() };
+    row.dwIndex = index;
+
+    let v0 = unsafe { GetIfEntry(&mut row) };
+    if v0 != NO_ERROR {
+        let info = format_message(v0)?;
+        return Err(std::io::Error::new(std::io::ErrorKind::Other, info));
+    }
+    row.dwMtu = mtu as u32;
+    let v2 = unsafe { SetIfEntry(&row) };
+    if v2 != NO_ERROR {
+        let info = format_message(v2)?;
+        return Err(std::io::Error::new(std::io::ErrorKind::Other, info));
     }
     Ok(())
 }
@@ -449,7 +471,8 @@ pub fn run_command(command: &str, args: &[&str]) -> std::io::Result<Vec<u8>> {
     let out = match std::process::Command::new(command).args(args).output() {
         Ok(out) => out,
         Err(e) => {
-            log::error!("Run command: \"{full_cmd}\" failed with: \"{e}\"");
+            let e2 = e.to_string().trim().to_string();
+            log::error!("Run command: \"{full_cmd}\" failed with: \"{e2}\"");
             return Err(e);
         }
     };
@@ -459,7 +482,7 @@ pub fn run_command(command: &str, args: &[&str]) -> std::io::Result<Vec<u8>> {
         } else {
             &out.stderr
         });
-        let info = format!("Run command: \"{full_cmd}\" failed with \"{err}\"");
+        let info = format!("Run command: \"{full_cmd}\" not success with \"{}\"", err.trim());
         log::error!("{}", info);
         return Err(std::io::Error::new(std::io::ErrorKind::Other, info));
     }
