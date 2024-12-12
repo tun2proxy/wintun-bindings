@@ -425,6 +425,14 @@ pub(crate) fn get_os_error_from_id(id: i32) -> std::io::Result<()> {
 }
 
 pub fn set_adapter_mtu(name: &str, mtu: usize) -> std::io::Result<()> {
+    if let Err(e) = set_adapter_mtu_cmd(name, mtu) {
+        log::error!("Failed to set MTU for adapter: {}", e);
+        set_adapter_mtu_api(name, mtu)?;
+    }
+    Ok(())
+}
+
+pub fn set_adapter_mtu_cmd(name: &str, mtu: usize) -> std::io::Result<()> {
     // command line: `netsh interface ipv4 set subinterface "MyAdapter" mtu=1500`
     let args = &[
         "interface",
@@ -434,15 +442,12 @@ pub fn set_adapter_mtu(name: &str, mtu: usize) -> std::io::Result<()> {
         &format!("\"{}\"", name),
         &format!("mtu={}", mtu),
     ];
-    if let Err(e) = run_command("netsh", args) {
-        log::error!("Failed to set MTU for adapter: {}", e);
-        set_adapter_mtu_2(name, mtu)?;
-    }
+    run_command("netsh", args)?;
     Ok(())
 }
 
 /// FIXME: This function perhapes is not working as expected, so don't use it for now.
-pub fn set_adapter_mtu_2(name: &str, mtu: usize) -> std::io::Result<()> {
+pub fn set_adapter_mtu_api(name: &str, mtu: usize) -> std::io::Result<()> {
     use windows_sys::Win32::NetworkManagement::IpHelper::{GetIfEntry, SetIfEntry, MIB_IFROW};
     let luid = crate::ffi::alias_to_luid(name)?;
     let index = crate::ffi::luid_to_index(&luid)?;
