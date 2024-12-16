@@ -173,16 +173,12 @@ impl Session {
         }
         let size = size as usize;
         if size > buf.len() {
-            unsafe {
-                wintun.WintunReleaseReceivePacket(self.inner.0, ptr);
-            }
+            unsafe { wintun.WintunReleaseReceivePacket(self.inner.0, ptr) };
             use std::io::{Error, ErrorKind::InvalidInput};
             return Err(Error::new(InvalidInput, "destination buffer too small"));
         }
         unsafe { ptr::copy_nonoverlapping(ptr, buf.as_mut_ptr(), size) };
-        unsafe {
-            wintun.WintunReleaseReceivePacket(self.inner.0, ptr);
-        }
+        unsafe { wintun.WintunReleaseReceivePacket(self.inner.0, ptr) };
         Ok(size)
     }
 
