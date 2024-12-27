@@ -21,11 +21,13 @@ pub(crate) struct LogItem {
 }
 
 impl LogItem {
+    #[allow(dead_code)]
     pub(crate) fn new(level: log::Level, msg: String, timestamp: u64) -> Self {
         Self { level, msg, timestamp }
     }
 }
 
+#[cfg(feature = "enable_inner_logging")]
 static LOG_CONTAINER: std::sync::LazyLock<std::sync::Mutex<std::collections::VecDeque<LogItem>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::VecDeque::new()));
 
@@ -35,13 +37,13 @@ static LOG_CONTAINER: std::sync::LazyLock<std::sync::Mutex<std::collections::Vec
 /// `message` must be a valid pointer that points to an aligned null terminated UTF-16 string
 pub unsafe extern "stdcall" fn default_logger(
     level: wintun_raw::WINTUN_LOGGER_LEVEL,
-    timestamp: wintun_raw::DWORD64,
+    _timestamp: wintun_raw::DWORD64,
     message: windows_sys::core::PCWSTR,
 ) {
     //Wintun will always give us a valid UTF16 null termineted string
     let utf8_msg = util::win_pwstr_to_string(message as *mut u16).unwrap_or_else(|e| e.to_string());
 
-    let l = match level {
+    let _l = match level {
         wintun_raw::WINTUN_LOGGER_LEVEL_WINTUN_LOG_INFO => {
             log::info!("WinTun: {}", utf8_msg);
             log::Level::Info
@@ -54,13 +56,15 @@ pub unsafe extern "stdcall" fn default_logger(
         _ => log::Level::Error,
     };
 
+    #[cfg(feature = "enable_inner_logging")]
     if let Err(e) = LOG_CONTAINER.lock().map(|mut log| {
-        log.push_back(LogItem::new(l, utf8_msg, timestamp));
+        log.push_back(LogItem::new(_l, utf8_msg, _timestamp));
     }) {
         log::error!("Failed to log message: {}", e);
     }
 }
 
+#[cfg(feature = "enable_inner_logging")]
 fn get_log() -> Vec<LogItem> {
     LOG_CONTAINER
         .lock()
@@ -68,6 +72,7 @@ fn get_log() -> Vec<LogItem> {
         .unwrap_or_else(|_e| Vec::new())
 }
 
+#[cfg(feature = "enable_inner_logging")]
 fn get_worst_log_msg(container: &[LogItem]) -> Option<&LogItem> {
     container.iter().max_by_key(|item| match item.level {
         log::Level::Error => 2,
@@ -78,6 +83,9 @@ fn get_worst_log_msg(container: &[LogItem]) -> Option<&LogItem> {
 }
 
 pub(crate) fn extract_wintun_log_error<T>(prifix: &str) -> Result<T, String> {
+    #[cfg(not(feature = "enable_inner_logging"))]
+    let info = "".to_string();
+    #[cfg(feature = "enable_inner_logging")]
     let info = get_worst_log_msg(&get_log())
         .map(|item| item.msg.clone())
         .unwrap_or_else(|| "No logs".to_string());

@@ -35,6 +35,7 @@ default = []
 async = ["blocking", "futures"]
 panic_on_unsent_packets = []
 verify_binary_signature = []
+enable_inner_logging = []
 
 [dependencies]
 blocking = { version = "1", optional = true }
