@@ -42,8 +42,14 @@ pub unsafe extern "stdcall" fn default_logger(
     let utf8_msg = util::win_pwstr_to_string(message as *mut u16).unwrap_or_else(|e| e.to_string());
 
     let l = match level {
-        wintun_raw::WINTUN_LOGGER_LEVEL_WINTUN_LOG_INFO => log::Level::Info,
-        wintun_raw::WINTUN_LOGGER_LEVEL_WINTUN_LOG_WARN => log::Level::Warn,
+        wintun_raw::WINTUN_LOGGER_LEVEL_WINTUN_LOG_INFO => {
+            log::info!("WinTun: {}", utf8_msg);
+            log::Level::Info
+        }
+        wintun_raw::WINTUN_LOGGER_LEVEL_WINTUN_LOG_WARN => {
+            log::warn!("WinTun: {}", utf8_msg);
+            log::Level::Warn
+        }
         wintun_raw::WINTUN_LOGGER_LEVEL_WINTUN_LOG_ERR => log::Level::Error,
         _ => log::Level::Error,
     };
