@@ -84,7 +84,7 @@ impl Adapter {
         let result = unsafe { wintun.WintunCreateAdapter(name_utf16.as_ptr(), tunnel_type_utf16.as_ptr(), &guid_s) };
 
         if result.is_null() {
-            return Err("Failed to create adapter".into());
+            return crate::log::extract_wintun_log_error("WintunCreateAdapter failed")?;
         }
         let mut call = || -> Result<Arc<Adapter>, Error> {
             let luid = crate::ffi::alias_to_luid(name)?;
@@ -123,7 +123,7 @@ impl Adapter {
         let result = unsafe { wintun.WintunOpenAdapter(name_utf16.as_ptr()) };
 
         if result.is_null() {
-            return Err("WintunOpenAdapter failed".into());
+            return crate::log::extract_wintun_log_error("WintunOpenAdapter failed")?;
         }
         let call = || -> Result<Arc<Adapter>, Error> {
             let luid = crate::ffi::alias_to_luid(name)?;
@@ -177,7 +177,7 @@ impl Adapter {
         let result = unsafe { self.wintun.WintunStartSession(self.adapter.0, capacity) };
 
         if result.is_null() {
-            return Err("WintunStartSession failed".into());
+            return crate::log::extract_wintun_log_error("WintunStartSession failed")?;
         }
         // Manual reset, because we use this event once and it must fire on all threads
         let shutdown_event = SafeEvent::new(true, false)?;
