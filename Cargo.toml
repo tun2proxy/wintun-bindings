@@ -26,7 +26,12 @@ features = ["async"]
 
 [features]
 default = []
-# default = ["verify_binary_signature", "panic_on_unsent_packets", "async"]
+# default = [
+#     "verify_binary_signature",
+#     "panic_on_unsent_packets",
+#     "async",
+#     "winreg",
+# ]
 async = ["blocking", "futures"]
 panic_on_unsent_packets = []
 verify_binary_signature = []
@@ -55,7 +60,7 @@ windows-sys = { version = "0.59", features = [
     "Win32_System_LibraryLoader",
     "Win32_Security_WinTrust",
 ] }
-winreg = "0.52.0"
+winreg = { version = "0.52.0", optional = true }
 
 [dev-dependencies]
 dotenvy = "0.15"

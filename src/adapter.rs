@@ -403,12 +403,13 @@ impl Adapter {
 
 impl Drop for Adapter {
     fn drop(&mut self) {
-        let name = self.get_name();
+        let _name = self.get_name();
         //Close adapter on drop
         //This is why we need an Arc of wintun
         unsafe { self.wintun.WintunCloseAdapter(self.adapter.0) };
         self.adapter = UnsafeHandle(ptr::null_mut());
-        if let Ok(name) = name {
+        #[cfg(feature = "winreg")]
+        if let Ok(name) = _name {
             // Delete registry related to network card
             _ = delete_adapter_info_from_reg(&name);
         }
@@ -416,6 +417,7 @@ impl Drop for Adapter {
 }
 
 /// This function is used to avoid the adapter name and guid being recorded in the registry
+#[cfg(feature = "winreg")]
 pub(crate) fn delete_adapter_info_from_reg(dev_name: &str) -> std::io::Result<()> {
     use winreg::{enums::HKEY_LOCAL_MACHINE, enums::KEY_ALL_ACCESS, RegKey};
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
