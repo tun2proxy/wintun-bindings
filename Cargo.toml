@@ -25,12 +25,12 @@ targets = [
 features = ["async"]
 
 [features]
-default = []
 # default = [
 #     "verify_binary_signature",
 #     "panic_on_unsent_packets",
 #     "async",
 #     "winreg",
+#     "enable_inner_logging",
 # ]
 async = ["blocking", "futures"]
 panic_on_unsent_packets = []
@@ -61,7 +61,7 @@ windows-sys = { version = "0.59", features = [
     "Win32_System_LibraryLoader",
     "Win32_Security_WinTrust",
 ] }
-winreg = { version = "0.52.0", optional = true }
+winreg = { package = "winreg2", version = "0.53", optional = true }
 
 [dev-dependencies]
 dotenvy = "0.15"

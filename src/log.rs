@@ -62,6 +62,10 @@ pub unsafe extern "stdcall" fn default_logger(
     }) {
         log::error!("Failed to log message: {}", e);
     }
+    #[cfg(not(feature = "enable_inner_logging"))]
+    if _l == log::Level::Error {
+        log::error!("WinTun: {}", utf8_msg);
+    }
 }
 
 #[cfg(feature = "enable_inner_logging")]
@@ -84,11 +88,11 @@ fn get_worst_log_msg(container: &[LogItem]) -> Option<&LogItem> {
 
 pub(crate) fn extract_wintun_log_error<T>(prifix: &str) -> Result<T, String> {
     #[cfg(not(feature = "enable_inner_logging"))]
-    let info = "".to_string();
+    let info = "No inner logs".to_string();
     #[cfg(feature = "enable_inner_logging")]
     let info = get_worst_log_msg(&get_log())
         .map(|item| item.msg.clone())
-        .unwrap_or_else(|| "No logs".to_string());
+        .unwrap_or_else(|| "No inner logs".to_string());
     Err(format!("{} \"{}\"", prifix, info))
 }
 
