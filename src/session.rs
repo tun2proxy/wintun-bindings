@@ -101,8 +101,9 @@ impl Session {
             .read_event
             .get_or_init(|| UnsafeHandle(unsafe { wintun.WintunGetReadWaitEvent(self.inner.0) })))
     }
-    pub fn get_shutdown_event(&self) -> Result<UnsafeHandle<HANDLE>, Error> {
-        Ok(self.shutdown_event.get_handle())
+
+    pub fn get_shutdown_event(&self) -> UnsafeHandle<HANDLE> {
+        self.shutdown_event.get_handle()
     }
 
     /// Blocks until a packet is available, returning the next packet in the receive queue once this happens.
