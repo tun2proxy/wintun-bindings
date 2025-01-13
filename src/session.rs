@@ -123,7 +123,7 @@ impl Session {
         }
     }
 
-    fn wait_read(&self) -> Result<(), Error> {
+    pub fn wait_read(&self) -> Result<(), Error> {
         //Wait on both the read handle and the shutdown handle so that we stop when requested
         let handles = [self.get_read_wait_event()?.0, self.shutdown_event.0 .0];
         let result = unsafe {
