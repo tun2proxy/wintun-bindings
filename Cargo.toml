@@ -1,6 +1,6 @@
 [package]
 name = "wintun-bindings"
-version = "0.7.28"
+version = "0.7.29"
 edition = "2021"
 authors = [
     "ssrlive",
@@ -22,7 +22,7 @@ targets = [
     "i686-pc-windows-msvc",
     "x86_64-pc-windows-msvc",
 ]
-features = ["async"]
+all-features = true
 
 [features]
 # default = [
