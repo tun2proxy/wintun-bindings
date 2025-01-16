@@ -135,13 +135,18 @@ pub fn get_active_network_interface_gateways() -> std::io::Result<Vec<IpAddr>> {
                 {
                     let sockaddr_ptr = gateway.Address.lpSockaddr;
                     let sockaddr = unsafe { &*(sockaddr_ptr as *const SOCKADDR) };
-                    let a = unsafe { sockaddr_to_socket_addr(sockaddr) }?;
-                    addrs.push(a.ip());
+                    match unsafe { sockaddr_to_socket_addr(sockaddr) } {
+                        Ok(a) => addrs.push(a.ip()),
+                        Err(e) => {
+                            log::error!("Failed to convert sockaddr to socket address: {}", e);
+                            return false;
+                        }
+                    }
                 }
                 current_gateway = gateway.Next;
             }
         }
-        Ok(())
+        true
     })?;
     Ok(addrs)
 }
@@ -237,7 +242,7 @@ pub(crate) unsafe fn sockaddr_in6_to_socket_addr(sockaddr_in6: &SOCKADDR_IN6) ->
 
 pub(crate) fn get_adapters_addresses<F>(mut callback: F) -> Result<(), Error>
 where
-    F: FnMut(IP_ADAPTER_ADDRESSES_LH) -> Result<(), Error>,
+    F: FnMut(IP_ADAPTER_ADDRESSES_LH) -> bool,
 {
     let mut size = 0;
     let flags = GAA_FLAG_INCLUDE_PREFIX | GAA_FLAG_INCLUDE_GATEWAYS;
@@ -276,7 +281,9 @@ where
     let mut current_addresses = addresses.as_ptr() as *const IP_ADAPTER_ADDRESSES_LH;
     while !current_addresses.is_null() {
         unsafe {
-            callback(*current_addresses)?;
+            if !callback(*current_addresses) {
+                break;
+            }
             current_addresses = (*current_addresses).Next;
         }
     }
@@ -285,7 +292,7 @@ where
 
 fn get_interface_info_sys<F>(mut callback: F) -> Result<(), Error>
 where
-    F: FnMut(IP_ADAPTER_INDEX_MAP) -> Result<(), Error>,
+    F: FnMut(IP_ADAPTER_INDEX_MAP) -> bool,
 {
     let mut buf_len: u32 = 0;
     //First figure out the size of the buffer needed to store the adapter info
@@ -357,7 +364,9 @@ where
     let interfaces = unsafe { std::slice::from_raw_parts(first_adapter, adapter_count as usize) };
 
     for interface in interfaces {
-        callback(*interface)?;
+        if !callback(*interface) {
+            break;
+        }
     }
     Ok(())
 }
@@ -366,16 +375,23 @@ where
 pub(crate) fn get_interface_info() -> Result<Vec<(u32, String)>, Error> {
     let mut v = vec![];
     get_interface_info_sys(|mut interface| {
-        let name = unsafe { win_pwstr_to_string(&mut interface.Name as _)? };
+        let name = match unsafe { win_pwstr_to_string(&mut interface.Name as _) } {
+            Ok(name) => name,
+            Err(e) => {
+                log::error!("Failed to convert interface name: {}", e);
+                return false;
+            }
+        };
         // Nam is something like: \DEVICE\TCPIP_{29C47F55-C7BD-433A-8BF7-408DFD3B3390}
         // where the GUID is the {29C4...90}, separated by dashes
-        let guid = name
-            .split('{')
-            .nth(1)
-            .and_then(|s| s.split('}').next())
-            .ok_or(format!("Failed to find GUID inside adapter name: {}", name))?;
-        v.push((interface.Index, guid.to_string()));
-        Ok(())
+        match name.split('{').nth(1).and_then(|s| s.split('}').next()) {
+            Some(guid) => v.push((interface.Index, guid.to_string())),
+            None => {
+                log::error!("Failed to extract GUID from interface name: {}", name);
+                return false;
+            }
+        }
+        true
     })?;
     Ok(v)
 }
@@ -538,7 +554,7 @@ pub(crate) fn get_mtu_by_index(index: u32, is_ipv6: bool) -> std::io::Result<u32
             if item.InterfaceIndex == index {
                 mtu = Some(item.NlMtu);
             }
-            Ok(())
+            true
         },
         is_ipv6,
     )?;
@@ -555,7 +571,7 @@ pub fn decode_utf16(string: &[u16]) -> String {
 
 pub fn get_ip_interface_table<F>(mut callback: F, is_ipv6: bool) -> std::io::Result<()>
 where
-    F: FnMut(&MIB_IPINTERFACE_ROW) -> std::io::Result<()>,
+    F: FnMut(&MIB_IPINTERFACE_ROW) -> bool,
 {
     let mut if_table: *mut MIB_IPINTERFACE_TABLE = std::ptr::null_mut();
     unsafe {
@@ -568,9 +584,8 @@ where
         use std::slice::from_raw_parts;
         let ifaces = from_raw_parts::<MIB_IPINTERFACE_ROW>(&(*if_table).Table[0], (*if_table).NumEntries as usize);
         for item in ifaces {
-            if let Err(e) = callback(item) {
-                FreeMibTable(if_table as _);
-                return Err(e);
+            if !callback(item) {
+                break;
             }
         }
         FreeMibTable(if_table as _);

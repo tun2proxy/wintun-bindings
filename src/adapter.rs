@@ -312,23 +312,27 @@ impl Adapter {
         let mut adapter_addresses = vec![];
 
         util::get_adapters_addresses(|adapter| {
-            let name_iter = unsafe { util::win_pstr_to_string(adapter.AdapterName) }?;
+            let name_iter = match unsafe { util::win_pstr_to_string(adapter.AdapterName) } {
+                Ok(name) => name,
+                Err(err) => {
+                    log::error!("Failed to parse adapter name: {}", err);
+                    return false;
+                }
+            };
             if name_iter == name {
                 let mut current_address = adapter.FirstUnicastAddress;
                 while !current_address.is_null() {
                     let address = unsafe { (*current_address).Address };
-                    let address = util::retrieve_ipaddr_from_socket_address(&address);
-                    if let Err(err) = address {
-                        log::error!("Failed to parse address: {}", err);
-                    } else {
-                        adapter_addresses.push(address?);
+                    match util::retrieve_ipaddr_from_socket_address(&address) {
+                        Ok(addr) => adapter_addresses.push(addr),
+                        Err(err) => {
+                            log::error!("Failed to parse address: {}", err);
+                        }
                     }
-                    unsafe {
-                        current_address = (*current_address).Next;
-                    }
+                    unsafe { current_address = (*current_address).Next };
                 }
             }
-            Ok(())
+            true
         })?;
 
         Ok(adapter_addresses)
@@ -339,23 +343,27 @@ impl Adapter {
         let name = util::guid_to_win_style_string(&GUID::from_u128(self.guid))?;
         let mut gateways = vec![];
         util::get_adapters_addresses(|adapter| {
-            let name_iter = unsafe { util::win_pstr_to_string(adapter.AdapterName) }?;
+            let name_iter = match unsafe { util::win_pstr_to_string(adapter.AdapterName) } {
+                Ok(name) => name,
+                Err(err) => {
+                    log::error!("Failed to parse adapter name: {}", err);
+                    return false;
+                }
+            };
             if name_iter == name {
                 let mut current_gateway = adapter.FirstGatewayAddress;
                 while !current_gateway.is_null() {
                     let gateway = unsafe { (*current_gateway).Address };
-                    let gateway = util::retrieve_ipaddr_from_socket_address(&gateway);
-                    if let Err(err) = gateway {
-                        log::error!("Failed to parse gateway: {}", err);
-                    } else {
-                        gateways.push(gateway?);
+                    match util::retrieve_ipaddr_from_socket_address(&gateway) {
+                        Ok(addr) => gateways.push(addr),
+                        Err(err) => {
+                            log::error!("Failed to parse gateway: {}", err);
+                        }
                     }
-                    unsafe {
-                        current_gateway = (*current_gateway).Next;
-                    }
+                    unsafe { current_gateway = (*current_gateway).Next };
                 }
             }
-            Ok(())
+            true
         })?;
         Ok(gateways)
     }
@@ -365,16 +373,24 @@ impl Adapter {
         let name = util::guid_to_win_style_string(&GUID::from_u128(self.guid))?;
         let mut subnet_mask = None;
         util::get_adapters_addresses(|adapter| {
-            let name_iter = unsafe { util::win_pstr_to_string(adapter.AdapterName) }?;
+            let name_iter = match unsafe { util::win_pstr_to_string(adapter.AdapterName) } {
+                Ok(name) => name,
+                Err(err) => {
+                    log::warn!("Failed to parse adapter name: {}", err);
+                    return false;
+                }
+            };
             if name_iter == name {
                 let mut current_address = adapter.FirstUnicastAddress;
                 while !current_address.is_null() {
                     let address = unsafe { (*current_address).Address };
-                    let address = util::retrieve_ipaddr_from_socket_address(&address);
-                    if let Err(ref err) = address {
-                        log::warn!("Failed to parse address: {}", err);
-                    }
-                    let address = address?;
+                    let address = match util::retrieve_ipaddr_from_socket_address(&address) {
+                        Ok(addr) => addr,
+                        Err(err) => {
+                            log::warn!("Failed to parse address: {}", err);
+                            return false;
+                        }
+                    };
                     if address == *target_address {
                         let masklength = unsafe { (*current_address).OnLinkPrefixLength };
                         match address {
@@ -382,22 +398,27 @@ impl Adapter {
                                 let mut mask = 0_u32;
                                 match unsafe { ConvertLengthToIpv4Mask(masklength as u32, &mut mask as *mut u32) } {
                                     0 => {}
-                                    err => return Err(std::io::Error::from_raw_os_error(err as i32).into()),
+                                    err => {
+                                        log::warn!("Failed to convert length to mask: {}", err);
+                                        return false;
+                                    }
                                 }
                                 subnet_mask = Some(IpAddr::V4(Ipv4Addr::from(mask.to_le_bytes())));
                             }
-                            IpAddr::V6(_) => {
-                                subnet_mask = Some(IpAddr::V6(util::ipv6_netmask_for_prefix(masklength)?));
-                            }
+                            IpAddr::V6(_) => match util::ipv6_netmask_for_prefix(masklength) {
+                                Ok(v) => subnet_mask = Some(IpAddr::V6(v)),
+                                Err(err) => {
+                                    log::warn!("Failed to convert length to mask: {}", err);
+                                    return false;
+                                }
+                            },
                         }
                         break;
                     }
-                    unsafe {
-                        current_address = (*current_address).Next;
-                    }
+                    unsafe { current_address = (*current_address).Next };
                 }
             }
-            Ok(())
+            true
         })?;
 
         Ok(subnet_mask.ok_or("Unable to find matching address")?)
