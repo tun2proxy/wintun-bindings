@@ -82,19 +82,16 @@ where
             } else {
                 "An unknown error occurred trying to verify the signature of the file."
             };
-            Err(std::io::Error::new(std::io::ErrorKind::Other, err))
+            Err(std::io::Error::other(err))
         }
-        TRUST_E_EXPLICIT_DISTRUST => Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        TRUST_E_EXPLICIT_DISTRUST => Err(std::io::Error::other(
             "The signature is present, but specifically disallowed.",
         )),
-        TRUST_E_SUBJECT_NOT_TRUSTED => Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        TRUST_E_SUBJECT_NOT_TRUSTED => Err(std::io::Error::other(
             "The signature is present, but not trusted.",
         )),
         CRYPT_E_SECURITY_SETTINGS => {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            Err(std::io::Error::other(
                 "The hash representing the subject or the publisher wasn't explicitly trusted by the admin and admin policy has disabled user trust. No signature, publisher or timestamp errors.",
             ))
         }
@@ -254,7 +251,7 @@ where
     use std::os::windows::ffi::OsStringExt;
     let path2 = std::ffi::OsString::from_wide(&buf[..len])
         .into_string()
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string_lossy()))?;
+        .map_err(|e| std::io::Error::other(e.to_string_lossy()))?;
 
     Ok(std::path::PathBuf::from(path2))
 }

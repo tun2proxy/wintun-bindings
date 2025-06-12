@@ -26,9 +26,7 @@ $prelude = @'
 #![allow(non_snake_case, non_camel_case_types)]
 #![cfg(target_os = "windows")]
 
-use windows_sys::core::GUID;
-use windows_sys::core::PCWSTR as LPCWSTR;
-use windows_sys::Win32::Foundation::BOOL;
+use windows_sys::core::{BOOL, GUID, PCWSTR as LPCWSTR};
 use windows_sys::Win32::Foundation::HANDLE;
 use windows_sys::Win32::NetworkManagement::Ndis::NET_LUID_LH as NET_LUID;
 pub type DWORD = core::ffi::c_ulong;

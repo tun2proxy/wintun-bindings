@@ -64,7 +64,7 @@ impl AsyncSession {
                 Ok(Some(packet)) => {
                     let size = packet.bytes.len();
                     if buf.len() < size {
-                        return Err(std::io::Error::new(std::io::ErrorKind::Other, "Buffer too small"));
+                        return Err(std::io::Error::other("Buffer too small"));
                     }
                     buf[..size].copy_from_slice(&packet.bytes[..size]);
                     return Ok(size);
@@ -79,7 +79,7 @@ impl AsyncSession {
                         WaitingStopReason::Ready => continue,
                     }
                 }
-                Err(err) => return Err(std::io::Error::new(std::io::ErrorKind::Other, err)),
+                Err(err) => return Err(std::io::Error::other(err)),
             }
         }
     }
@@ -98,14 +98,13 @@ impl AsyncSession {
 
 impl AsyncRead for AsyncSession {
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
-        use std::io::{Error, ErrorKind::Other};
         loop {
             match &mut self.read_state {
                 ReadState::Idle => match self.session.try_receive() {
                     Ok(Some(packet)) => {
                         let size = packet.bytes.len();
                         if buf.len() < size {
-                            return Poll::Ready(Err(Error::new(Other, "Buffer too small")));
+                            return Poll::Ready(Err(std::io::Error::other("Buffer too small")));
                         }
                         buf[..size].copy_from_slice(&packet.bytes[..size]);
                         return Poll::Ready(Ok(size));
@@ -118,7 +117,7 @@ impl AsyncRead for AsyncSession {
                         })));
                         self.read_state = ReadState::Waiting(Some(task));
                     }
-                    Err(err) => return Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Other, err))),
+                    Err(err) => return Poll::Ready(Err(std::io::Error::other(err))),
                 },
                 ReadState::Waiting(task) => {
                     let task = match task.take() {
@@ -130,7 +129,7 @@ impl AsyncRead for AsyncSession {
                         Ok(guard) => guard,
                         Err(e) => {
                             self.read_state = ReadState::Waiting(Some(task));
-                            return Poll::Ready(Err(Error::new(Other, format!("Lock task failed: {}", e))));
+                            return Poll::Ready(Err(std::io::Error::other(format!("Lock task failed: {}", e))));
                         }
                     };
                     self.read_state = match Pin::new(&mut *task_guard).poll(cx) {

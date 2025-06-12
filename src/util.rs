@@ -36,10 +36,7 @@ pub fn get_wintun_bin_pattern_path() -> std::io::Result<std::path::PathBuf> {
     } else if cfg!(target_arch = "aarch64") {
         "wintun/bin/arm64/wintun.dll"
     } else {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Unsupported architecture",
-        ));
+        return Err(std::io::Error::other("Unsupported architecture"));
     };
     Ok(dll_path.into())
 }
@@ -219,11 +216,10 @@ pub(crate) fn retrieve_ipaddr_from_socket_address(address: &SOCKET_ADDRESS) -> R
 }
 
 pub(crate) unsafe fn sockaddr_to_socket_addr(sock_addr: *const SOCKADDR) -> std::io::Result<SocketAddr> {
-    use std::io::{Error, ErrorKind};
     let address = match (*sock_addr).sa_family {
         AF_INET => sockaddr_in_to_socket_addr(&*(sock_addr as *const SOCKADDR_IN)),
         AF_INET6 => sockaddr_in6_to_socket_addr(&*(sock_addr as *const SOCKADDR_IN6)),
-        _ => return Err(Error::new(ErrorKind::Other, "Unsupported address type")),
+        _ => return Err(std::io::Error::other("Unsupported address type")),
     };
     Ok(address)
 }
@@ -477,13 +473,13 @@ pub fn set_adapter_mtu_api(name: &str, mtu: usize) -> std::io::Result<()> {
     let v0 = unsafe { GetIfEntry(&mut row) };
     if v0 != NO_ERROR {
         let info = format_message(v0)?;
-        return Err(std::io::Error::new(std::io::ErrorKind::Other, info));
+        return Err(std::io::Error::other(info));
     }
     row.dwMtu = mtu as u32;
     let v2 = unsafe { SetIfEntry(&row) };
     if v2 != NO_ERROR {
         let info = format_message(v2)?;
-        return Err(std::io::Error::new(std::io::ErrorKind::Other, info));
+        return Err(std::io::Error::other(info));
     }
     Ok(())
 }
@@ -508,7 +504,7 @@ pub fn run_command(command: &str, args: &[&str]) -> std::io::Result<Vec<u8>> {
         });
         let info = format!("Run command: \"{full_cmd}\" not success with \"{}\"", err.trim());
         log::error!("{}", info);
-        return Err(std::io::Error::new(std::io::ErrorKind::Other, info));
+        return Err(std::io::Error::other(info));
     }
     Ok(out.stdout)
 }
