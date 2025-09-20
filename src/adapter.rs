@@ -196,10 +196,9 @@ impl Adapter {
 
     /// Set `MTU` of this adapter
     pub fn set_mtu(&self, mtu: usize) -> Result<(), Error> {
-        let name = self.get_name()?;
-        util::set_adapter_mtu(&name, mtu, false)?;
+        util::set_adapter_mtu(&self.luid, mtu, false)?;
         // FIXME: Here we set the IPv6 MTU as well for consistency, but for some users it may not be expected.
-        util::set_adapter_mtu(&name, mtu, true)?;
+        util::set_adapter_mtu(&self.luid, mtu, true)?;
         Ok(())
     }
 

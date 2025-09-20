@@ -9,13 +9,13 @@ use windows_sys::{
         },
         NetworkManagement::{
             IpHelper::{
-                FreeMibTable, GetAdaptersAddresses, GetInterfaceInfo, DNS_INTERFACE_SETTINGS,
-                DNS_INTERFACE_SETTINGS_VERSION1, DNS_SETTING_NAMESERVER, GAA_FLAG_INCLUDE_GATEWAYS,
-                GAA_FLAG_INCLUDE_PREFIX, IF_TYPE_ETHERNET_CSMACD, IF_TYPE_IEEE80211, IP_ADAPTER_ADDRESSES_LH,
-                IP_ADAPTER_INDEX_MAP, IP_INTERFACE_INFO,
+                FreeMibTable, GetAdaptersAddresses, GetInterfaceInfo, GetIpInterfaceEntry, GetIpInterfaceTable,
+                SetIpInterfaceEntry, DNS_INTERFACE_SETTINGS, DNS_INTERFACE_SETTINGS_VERSION1, DNS_SETTING_NAMESERVER,
+                GAA_FLAG_INCLUDE_GATEWAYS, GAA_FLAG_INCLUDE_PREFIX, IF_TYPE_ETHERNET_CSMACD, IF_TYPE_IEEE80211,
+                IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_INDEX_MAP, IP_INTERFACE_INFO, MIB_IPINTERFACE_ROW,
+                MIB_IPINTERFACE_TABLE,
             },
-            IpHelper::{GetIpInterfaceTable, MIB_IPINTERFACE_ROW, MIB_IPINTERFACE_TABLE},
-            Ndis::IfOperStatusUp,
+            Ndis::{IfOperStatusUp, NET_LUID_LH},
         },
         Networking::WinSock::{AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKET_ADDRESS},
         System::{
@@ -438,10 +438,11 @@ pub(crate) fn get_os_error_from_id(id: i32) -> std::io::Result<()> {
     }
 }
 
-pub fn set_adapter_mtu(name: &str, mtu: usize, is_ipv6: bool) -> std::io::Result<()> {
-    if let Err(e) = set_adapter_mtu_cmd(name, mtu, is_ipv6) {
-        log::error!("Failed to set MTU for adapter: {}", e);
-        set_adapter_mtu_api(name, mtu)?;
+pub fn set_adapter_mtu(luid: &NET_LUID_LH, mtu: usize, is_ipv6: bool) -> std::io::Result<()> {
+    if let Err(e) = set_adapter_mtu_api(luid, mtu, is_ipv6) {
+        log::error!("Failed to set MTU for adapter: {e}");
+        let name = crate::ffi::luid_to_alias(luid)?;
+        set_adapter_mtu_cmd(&name, mtu, is_ipv6)?;
     }
     Ok(())
 }
@@ -461,26 +462,30 @@ pub fn set_adapter_mtu_cmd(name: &str, mtu: usize, is_ipv6: bool) -> std::io::Re
     Ok(())
 }
 
-/// FIXME: This function perhapes is not working as expected, so don't use it for now.
-pub fn set_adapter_mtu_api(name: &str, mtu: usize) -> std::io::Result<()> {
-    use windows_sys::Win32::NetworkManagement::IpHelper::{GetIfEntry, SetIfEntry, MIB_IFROW};
-    let luid = crate::ffi::alias_to_luid(name)?;
-    let index = crate::ffi::luid_to_index(&luid)?;
+pub fn set_adapter_mtu_api(luid: &NET_LUID_LH, mtu: usize, is_ipv6: bool) -> std::io::Result<()> {
+    let mut row = MIB_IPINTERFACE_ROW {
+        Family: if is_ipv6 { AF_INET6 } else { AF_INET },
+        InterfaceLuid: *luid,
+        ..Default::default()
+    };
 
-    let mut row: MIB_IFROW = unsafe { std::mem::zeroed() };
-    row.dwIndex = index;
+    // SAFETY: `row` is initialized and has luid set
+    let status = unsafe { GetIpInterfaceEntry(&mut row) };
+    if status != NO_ERROR {
+        return Err(std::io::Error::from_raw_os_error(status as i32));
+    }
 
-    let v0 = unsafe { GetIfEntry(&mut row) };
-    if v0 != NO_ERROR {
-        let info = format_message(v0)?;
-        return Err(std::io::Error::other(info));
+    // `SitePrefixLength` must be zeroed (see docs)
+    row.SitePrefixLength = 0;
+
+    row.NlMtu = mtu as u32;
+
+    // SAFETY: `row` is initialized and has luid set
+    let status = unsafe { SetIpInterfaceEntry(&mut row) };
+    if status != NO_ERROR {
+        return Err(std::io::Error::from_raw_os_error(status as i32));
     }
-    row.dwMtu = mtu as u32;
-    let v2 = unsafe { SetIfEntry(&row) };
-    if v2 != NO_ERROR {
-        let info = format_message(v2)?;
-        return Err(std::io::Error::other(info));
-    }
+
     Ok(())
 }
 
