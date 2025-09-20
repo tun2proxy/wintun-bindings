@@ -439,30 +439,6 @@ pub(crate) fn get_os_error_from_id(id: i32) -> std::io::Result<()> {
 }
 
 pub fn set_adapter_mtu(luid: &NET_LUID_LH, mtu: usize, is_ipv6: bool) -> std::io::Result<()> {
-    if let Err(e) = set_adapter_mtu_api(luid, mtu, is_ipv6) {
-        log::error!("Failed to set MTU for adapter: {e}");
-        let name = crate::ffi::luid_to_alias(luid)?;
-        set_adapter_mtu_cmd(&name, mtu, is_ipv6)?;
-    }
-    Ok(())
-}
-
-pub fn set_adapter_mtu_cmd(name: &str, mtu: usize, is_ipv6: bool) -> std::io::Result<()> {
-    // command line: `netsh interface ipv4 set subinterface "MyAdapter" mtu=1500`
-    let ip_str = if is_ipv6 { "ipv6" } else { "ipv4" };
-    let args = &[
-        "interface",
-        ip_str,
-        "set",
-        "subinterface",
-        &format!("\"{}\"", name),
-        &format!("mtu={}", mtu),
-    ];
-    run_command("netsh", args)?;
-    Ok(())
-}
-
-pub fn set_adapter_mtu_api(luid: &NET_LUID_LH, mtu: usize, is_ipv6: bool) -> std::io::Result<()> {
     let mut row = MIB_IPINTERFACE_ROW {
         Family: if is_ipv6 { AF_INET6 } else { AF_INET },
         InterfaceLuid: *luid,
