@@ -205,7 +205,7 @@ impl Adapter {
     /// Returns `MTU` of this adapter
     pub fn get_mtu(&self) -> Result<usize, Error> {
         // FIXME: Here we get the IPv4 MTU only, but for some users it may not be expected.
-        Ok(util::get_mtu_by_index(self.index, false)? as _)
+        Ok(util::get_adapter_mtu(&self.luid, false)? as _)
     }
 
     /// Returns the Win32 interface index of this adapter. Useful for specifying the interface
