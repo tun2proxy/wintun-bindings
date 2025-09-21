@@ -9,13 +9,12 @@ use windows_sys::{
         },
         NetworkManagement::{
             IpHelper::{
-                FreeMibTable, GetAdaptersAddresses, GetInterfaceInfo, DNS_INTERFACE_SETTINGS,
-                DNS_INTERFACE_SETTINGS_VERSION1, DNS_SETTING_NAMESERVER, GAA_FLAG_INCLUDE_GATEWAYS,
-                GAA_FLAG_INCLUDE_PREFIX, IF_TYPE_ETHERNET_CSMACD, IF_TYPE_IEEE80211, IP_ADAPTER_ADDRESSES_LH,
-                IP_ADAPTER_INDEX_MAP, IP_INTERFACE_INFO,
+                GetAdaptersAddresses, GetInterfaceInfo, GetIpInterfaceEntry, SetIpInterfaceEntry,
+                DNS_INTERFACE_SETTINGS, DNS_INTERFACE_SETTINGS_VERSION1, DNS_SETTING_NAMESERVER,
+                GAA_FLAG_INCLUDE_GATEWAYS, GAA_FLAG_INCLUDE_PREFIX, IF_TYPE_ETHERNET_CSMACD, IF_TYPE_IEEE80211,
+                IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_INDEX_MAP, IP_INTERFACE_INFO, MIB_IPINTERFACE_ROW,
             },
-            IpHelper::{GetIpInterfaceTable, MIB_IPINTERFACE_ROW, MIB_IPINTERFACE_TABLE},
-            Ndis::IfOperStatusUp,
+            Ndis::{IfOperStatusUp, NET_LUID_LH},
         },
         Networking::WinSock::{AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKET_ADDRESS},
         System::{
@@ -438,50 +437,41 @@ pub(crate) fn get_os_error_from_id(id: i32) -> std::io::Result<()> {
     }
 }
 
-pub fn set_adapter_mtu(name: &str, mtu: usize, is_ipv6: bool) -> std::io::Result<()> {
-    if let Err(e) = set_adapter_mtu_cmd(name, mtu, is_ipv6) {
-        log::error!("Failed to set MTU for adapter: {}", e);
-        set_adapter_mtu_api(name, mtu)?;
+pub fn set_adapter_mtu(luid: &NET_LUID_LH, mtu: usize, is_ipv6: bool) -> std::io::Result<()> {
+    let mut row = get_ip_interface(luid, is_ipv6)?;
+
+    // `SitePrefixLength` must be zeroed (see docs)
+    row.SitePrefixLength = 0;
+
+    row.NlMtu = mtu as u32;
+
+    // SAFETY: `row` is initialized and has luid set
+    let status = unsafe { SetIpInterfaceEntry(&mut row) };
+    if status != NO_ERROR {
+        return Err(std::io::Error::from_raw_os_error(status as i32));
     }
+
     Ok(())
 }
 
-pub fn set_adapter_mtu_cmd(name: &str, mtu: usize, is_ipv6: bool) -> std::io::Result<()> {
-    // command line: `netsh interface ipv4 set subinterface "MyAdapter" mtu=1500`
-    let ip_str = if is_ipv6 { "ipv6" } else { "ipv4" };
-    let args = &[
-        "interface",
-        ip_str,
-        "set",
-        "subinterface",
-        &format!("\"{}\"", name),
-        &format!("mtu={}", mtu),
-    ];
-    run_command("netsh", args)?;
-    Ok(())
+pub(crate) fn get_adapter_mtu(luid: &NET_LUID_LH, is_ipv6: bool) -> std::io::Result<u32> {
+    get_ip_interface(luid, is_ipv6).map(|row| row.NlMtu)
 }
 
-/// FIXME: This function perhapes is not working as expected, so don't use it for now.
-pub fn set_adapter_mtu_api(name: &str, mtu: usize) -> std::io::Result<()> {
-    use windows_sys::Win32::NetworkManagement::IpHelper::{GetIfEntry, SetIfEntry, MIB_IFROW};
-    let luid = crate::ffi::alias_to_luid(name)?;
-    let index = crate::ffi::luid_to_index(&luid)?;
+fn get_ip_interface(luid: &NET_LUID_LH, is_ipv6: bool) -> std::io::Result<MIB_IPINTERFACE_ROW> {
+    let mut row = MIB_IPINTERFACE_ROW {
+        Family: if is_ipv6 { AF_INET6 } else { AF_INET },
+        InterfaceLuid: *luid,
+        ..Default::default()
+    };
 
-    let mut row: MIB_IFROW = unsafe { std::mem::zeroed() };
-    row.dwIndex = index;
+    // SAFETY: `row` is initialized and has luid set
+    let status = unsafe { GetIpInterfaceEntry(&mut row) };
+    if status != NO_ERROR {
+        return Err(std::io::Error::from_raw_os_error(status as i32));
+    }
 
-    let v0 = unsafe { GetIfEntry(&mut row) };
-    if v0 != NO_ERROR {
-        let info = format_message(v0)?;
-        return Err(std::io::Error::other(info));
-    }
-    row.dwMtu = mtu as u32;
-    let v2 = unsafe { SetIfEntry(&row) };
-    if v2 != NO_ERROR {
-        let info = format_message(v2)?;
-        return Err(std::io::Error::other(info));
-    }
-    Ok(())
+    Ok(row)
 }
 
 /// Runs a command and returns an error if the command fails, just convenience for users.
@@ -509,85 +499,9 @@ pub fn run_command(command: &str, args: &[&str]) -> std::io::Result<Vec<u8>> {
     Ok(out.stdout)
 }
 
-/*
-use windows_sys::Win32::NetworkManagement::IpHelper::{GetIfTable2, MIB_IF_ROW2, MIB_IF_TABLE2};
-use windows_sys::Win32::NetworkManagement::Ndis::NET_LUID_LH;
-pub(crate) fn get_adapter_mtu(luid: &NET_LUID_LH) -> std::io::Result<usize> {
-    unsafe {
-        let mut if_table: *mut MIB_IF_TABLE2 = std::ptr::null_mut();
-        match GetIfTable2(&mut if_table as *mut *mut _) {
-            0 => (),
-            e => return Err(std::io::Error::from_raw_os_error(e as i32)),
-        }
-
-        let num_entries = (*if_table).NumEntries as usize;
-        let mut mtu = None;
-
-        let luid = &luid.Info as *const _ as *const _NET_LUID_LH_INFO;
-
-        let table = &(*if_table).Table as *const MIB_IF_ROW2;
-        let table = std::slice::from_raw_parts(table, num_entries);
-
-        for if_row in table {
-            let info = &if_row.InterfaceLuid.Info as *const _ as *const _NET_LUID_LH_INFO;
-
-            if (*info).IfType() == (*luid).IfType() && (*info).NetLuidIndex() == (*luid).NetLuidIndex() {
-                mtu = Some(if_row.Mtu as usize);
-                break;
-            }
-        }
-
-        // There is no return value for `FreeMibTable`, so we ignore the return value
-        FreeMibTable(if_table as *mut _);
-        mtu.ok_or(std::io::Error::new(std::io::ErrorKind::NotFound, "Adapter not found"))
-    }
-}
-// */
-
-pub(crate) fn get_mtu_by_index(index: u32, is_ipv6: bool) -> std::io::Result<u32> {
-    let mut mtu = None;
-    get_ip_interface_table(
-        |item| {
-            if item.InterfaceIndex == index {
-                mtu = Some(item.NlMtu);
-            }
-            true
-        },
-        is_ipv6,
-    )?;
-    let Some(mtu) = mtu else {
-        return Err(std::io::Error::from(std::io::ErrorKind::NotFound));
-    };
-    Ok(mtu)
-}
-
 pub fn decode_utf16(string: &[u16]) -> String {
     let end = string.iter().position(|b| *b == 0).unwrap_or(string.len());
     String::from_utf16_lossy(&string[..end])
-}
-
-pub fn get_ip_interface_table<F>(mut callback: F, is_ipv6: bool) -> std::io::Result<()>
-where
-    F: FnMut(&MIB_IPINTERFACE_ROW) -> bool,
-{
-    let mut if_table: *mut MIB_IPINTERFACE_TABLE = std::ptr::null_mut();
-    unsafe {
-        if GetIpInterfaceTable(if is_ipv6 { AF_INET6 } else { AF_INET }, &mut if_table as _) != NO_ERROR {
-            return Err(std::io::Error::last_os_error());
-        }
-        if if_table.is_null() {
-            return Err(std::io::Error::from(std::io::ErrorKind::NotFound));
-        }
-        use std::slice::from_raw_parts;
-        let ifaces = from_raw_parts::<MIB_IPINTERFACE_ROW>(&(*if_table).Table[0], (*if_table).NumEntries as usize);
-        for item in ifaces {
-            if !callback(item) {
-                break;
-            }
-        }
-        FreeMibTable(if_table as _);
-    }
-    Ok(())
 }
 
 #[repr(C, align(1))]

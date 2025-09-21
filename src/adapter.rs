@@ -196,17 +196,16 @@ impl Adapter {
 
     /// Set `MTU` of this adapter
     pub fn set_mtu(&self, mtu: usize) -> Result<(), Error> {
-        let name = self.get_name()?;
-        util::set_adapter_mtu(&name, mtu, false)?;
+        util::set_adapter_mtu(&self.luid, mtu, false)?;
         // FIXME: Here we set the IPv6 MTU as well for consistency, but for some users it may not be expected.
-        util::set_adapter_mtu(&name, mtu, true)?;
+        util::set_adapter_mtu(&self.luid, mtu, true)?;
         Ok(())
     }
 
     /// Returns `MTU` of this adapter
     pub fn get_mtu(&self) -> Result<usize, Error> {
         // FIXME: Here we get the IPv4 MTU only, but for some users it may not be expected.
-        Ok(util::get_mtu_by_index(self.index, false)? as _)
+        Ok(util::get_adapter_mtu(&self.luid, false)? as _)
     }
 
     /// Returns the Win32 interface index of this adapter. Useful for specifying the interface
