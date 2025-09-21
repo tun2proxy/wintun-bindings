@@ -35,7 +35,7 @@ static LOG_CONTAINER: std::sync::LazyLock<std::sync::Mutex<std::collections::Vec
 ///
 /// # Safety
 /// `message` must be a valid pointer that points to an aligned null terminated UTF-16 string
-pub unsafe extern "stdcall" fn default_logger(
+pub unsafe extern "system" fn default_logger(
     level: wintun_raw::WINTUN_LOGGER_LEVEL,
     _timestamp: wintun_raw::DWORD64,
     message: windows_sys::core::PCWSTR,
