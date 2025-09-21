@@ -30,7 +30,7 @@ pub const WINTUN_LOGGER_LEVEL_WINTUN_LOG_ERR: WINTUN_LOGGER_LEVEL = 2;
 pub type WINTUN_LOGGER_LEVEL = ::std::os::raw::c_int;
 #[doc = " Called by internal logger to report diagnostic messages\n\n @param Level         Message level.\n\n @param Timestamp     Message timestamp in in 100ns intervals since 1601-01-01 UTC.\n\n @param Message       Message text."]
 pub type WINTUN_LOGGER_CALLBACK =
-    ::std::option::Option<unsafe extern "stdcall" fn(Level: WINTUN_LOGGER_LEVEL, Timestamp: DWORD64, Message: LPCWSTR)>;
+    ::std::option::Option<unsafe extern "system" fn(Level: WINTUN_LOGGER_LEVEL, Timestamp: DWORD64, Message: LPCWSTR)>;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct _TUN_SESSION {
@@ -42,21 +42,21 @@ extern crate libloading;
 pub struct wintun {
     __library: ::libloading::Library,
     pub WintunCreateAdapter:
-        unsafe extern "stdcall" fn(arg1: LPCWSTR, arg2: LPCWSTR, arg3: *const GUID) -> WINTUN_ADAPTER_HANDLE,
-    pub WintunCloseAdapter: unsafe extern "stdcall" fn(arg1: WINTUN_ADAPTER_HANDLE),
-    pub WintunOpenAdapter: unsafe extern "stdcall" fn(arg1: LPCWSTR) -> WINTUN_ADAPTER_HANDLE,
-    pub WintunGetAdapterLUID: unsafe extern "stdcall" fn(arg1: WINTUN_ADAPTER_HANDLE, arg2: *mut NET_LUID),
-    pub WintunGetRunningDriverVersion: unsafe extern "stdcall" fn() -> DWORD,
-    pub WintunDeleteDriver: unsafe extern "stdcall" fn() -> BOOL,
-    pub WintunSetLogger: unsafe extern "stdcall" fn(arg1: WINTUN_LOGGER_CALLBACK),
+        unsafe extern "system" fn(arg1: LPCWSTR, arg2: LPCWSTR, arg3: *const GUID) -> WINTUN_ADAPTER_HANDLE,
+    pub WintunCloseAdapter: unsafe extern "system" fn(arg1: WINTUN_ADAPTER_HANDLE),
+    pub WintunOpenAdapter: unsafe extern "system" fn(arg1: LPCWSTR) -> WINTUN_ADAPTER_HANDLE,
+    pub WintunGetAdapterLUID: unsafe extern "system" fn(arg1: WINTUN_ADAPTER_HANDLE, arg2: *mut NET_LUID),
+    pub WintunGetRunningDriverVersion: unsafe extern "system" fn() -> DWORD,
+    pub WintunDeleteDriver: unsafe extern "system" fn() -> BOOL,
+    pub WintunSetLogger: unsafe extern "system" fn(arg1: WINTUN_LOGGER_CALLBACK),
     pub WintunStartSession:
-        unsafe extern "stdcall" fn(arg1: WINTUN_ADAPTER_HANDLE, arg2: DWORD) -> WINTUN_SESSION_HANDLE,
-    pub WintunEndSession: unsafe extern "stdcall" fn(arg1: WINTUN_SESSION_HANDLE),
-    pub WintunGetReadWaitEvent: unsafe extern "stdcall" fn(arg1: WINTUN_SESSION_HANDLE) -> HANDLE,
-    pub WintunReceivePacket: unsafe extern "stdcall" fn(arg1: WINTUN_SESSION_HANDLE, arg2: *mut DWORD) -> *mut BYTE,
-    pub WintunReleaseReceivePacket: unsafe extern "stdcall" fn(arg1: WINTUN_SESSION_HANDLE, arg2: *const BYTE),
-    pub WintunAllocateSendPacket: unsafe extern "stdcall" fn(arg1: WINTUN_SESSION_HANDLE, arg2: DWORD) -> *mut BYTE,
-    pub WintunSendPacket: unsafe extern "stdcall" fn(arg1: WINTUN_SESSION_HANDLE, arg2: *const BYTE),
+        unsafe extern "system" fn(arg1: WINTUN_ADAPTER_HANDLE, arg2: DWORD) -> WINTUN_SESSION_HANDLE,
+    pub WintunEndSession: unsafe extern "system" fn(arg1: WINTUN_SESSION_HANDLE),
+    pub WintunGetReadWaitEvent: unsafe extern "system" fn(arg1: WINTUN_SESSION_HANDLE) -> HANDLE,
+    pub WintunReceivePacket: unsafe extern "system" fn(arg1: WINTUN_SESSION_HANDLE, arg2: *mut DWORD) -> *mut BYTE,
+    pub WintunReleaseReceivePacket: unsafe extern "system" fn(arg1: WINTUN_SESSION_HANDLE, arg2: *const BYTE),
+    pub WintunAllocateSendPacket: unsafe extern "system" fn(arg1: WINTUN_SESSION_HANDLE, arg2: DWORD) -> *mut BYTE,
+    pub WintunSendPacket: unsafe extern "system" fn(arg1: WINTUN_SESSION_HANDLE, arg2: *const BYTE),
 }
 impl wintun {
     pub unsafe fn new<P>(path: P) -> Result<Self, ::libloading::Error>
