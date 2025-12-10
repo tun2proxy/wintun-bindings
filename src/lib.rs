@@ -102,7 +102,8 @@ where
             return Err(format!("Signer \"{}\" not match \"{}\"", signer_name, wp).into());
         }
     }
-    unsafe { Ok(Arc::new(wintun_raw::wintun::new(path)?)) }
+    let path2: std::path::PathBuf = path.as_ref().into();
+    unsafe { Ok(Arc::new(wintun_raw::wintun::new(&path2)?)) }
 }
 
 /// Attempts to load the Wintun library from an existing [`libloading::Library`].

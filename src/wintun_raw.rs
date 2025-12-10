@@ -61,7 +61,7 @@ pub struct wintun {
 impl wintun {
     pub unsafe fn new<P>(path: P) -> Result<Self, ::libloading::Error>
     where
-        P: AsRef<::std::ffi::OsStr>,
+        P: ::libloading::AsFilename,
     {
         let library = ::libloading::Library::new(path)?;
         Self::from_library(library)
