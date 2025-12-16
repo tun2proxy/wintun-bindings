@@ -1,4 +1,4 @@
-use crate::{util, wintun_raw, Wintun};
+use crate::{Wintun, util, wintun_raw};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Sets the logger wintun will use when logging. Maps to the WintunSetLogger C function
@@ -41,7 +41,7 @@ pub unsafe extern "system" fn default_logger(
     message: windows_sys::core::PCWSTR,
 ) {
     //Wintun will always give us a valid UTF16 null termineted string
-    let utf8_msg = util::win_pwstr_to_string(message as *mut u16).unwrap_or_else(|e| e.to_string());
+    let utf8_msg = unsafe { util::win_pwstr_to_string(message as *mut u16).unwrap_or_else(|e| e.to_string()) };
 
     let _l = match level {
         wintun_raw::WINTUN_LOGGER_LEVEL_WINTUN_LOG_INFO => {

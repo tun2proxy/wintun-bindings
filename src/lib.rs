@@ -71,7 +71,7 @@ use std::sync::Arc;
 ///
 /// For more information see [`libloading`]'s dynamic library safety guarantees: [`libloading`][`libloading::Library::new`]
 pub unsafe fn load() -> Result<Wintun, Error> {
-    load_from_path("wintun")
+    unsafe { load_from_path("wintun") }
 }
 
 /// Attempts to load the Wintun library as a dynamic library from the given path.
@@ -94,7 +94,7 @@ where
     {
         use verify_binary_signature::{get_dll_absolute_path, get_signer_name, verify_signature};
         // Ensure the dll file has not been tampered with.
-        let abs_path = get_dll_absolute_path(&path)?;
+        let abs_path = unsafe { get_dll_absolute_path(&path) }?;
         verify_signature(&abs_path)?;
         let signer_name = get_signer_name(&abs_path)?;
         let wp = WINTUN_PROVIDER;

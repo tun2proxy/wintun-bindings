@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 use windows_sys::Win32::{
     Foundation::{FALSE, HANDLE, WAIT_ABANDONED_0, WAIT_EVENT, WAIT_OBJECT_0},
-    System::Threading::{WaitForMultipleObjects, INFINITE},
+    System::Threading::{INFINITE, WaitForMultipleObjects},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

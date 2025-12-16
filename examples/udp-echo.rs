@@ -15,8 +15,8 @@ use windows_sys::Win32::{
     Security::Cryptography::{CryptAcquireContextW, CryptGenRandom, CryptReleaseContext, PROV_RSA_FULL},
 };
 use wintun_bindings::{
-    get_active_network_interface_gateways, get_running_driver_version, get_wintun_bin_pattern_path, load_from_path,
-    run_command, Adapter, BoxError, Error, MAX_RING_CAPACITY,
+    Adapter, BoxError, Error, MAX_RING_CAPACITY, get_active_network_interface_gateways, get_running_driver_version,
+    get_wintun_bin_pattern_path, load_from_path, run_command,
 };
 
 #[derive(Debug)]
@@ -231,7 +231,7 @@ fn main() -> Result<(), BoxError> {
 }
 
 fn extract_udp_packet(packet: &[u8]) -> Result<NaiveUdpPacket, Error> {
-    use packet::{ip, udp, AsPacket, Packet};
+    use packet::{AsPacket, Packet, ip, udp};
     let packet: ip::Packet<_> = packet.as_packet().map_err(|err| format!("{}", err))?;
     let info: String;
     match packet {

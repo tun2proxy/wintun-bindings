@@ -3,7 +3,7 @@ use windows_sys::Win32::{
     System::Threading::{CreateEventW, SetEvent},
 };
 
-use crate::{util::get_last_error, Error};
+use crate::{Error, util::get_last_error};
 
 /// A wrapper struct that allows a type to be Send and Sync
 #[derive(Copy, Clone, Debug)]
@@ -34,14 +34,14 @@ impl SafeEvent {
     }
 
     pub(crate) fn set_event(&self) -> Result<(), Error> {
-        if unsafe { SetEvent(self.0 .0) } == FALSE {
+        if unsafe { SetEvent(self.0.0) } == FALSE {
             return Err(get_last_error()?.into());
         }
         Ok(())
     }
 
     pub(crate) fn close_handle(&self) -> Result<(), Error> {
-        if !self.0 .0.is_null() && unsafe { CloseHandle(self.0 .0) } == FALSE {
+        if !self.0.0.is_null() && unsafe { CloseHandle(self.0.0) } == FALSE {
             return Err(get_last_error()?.into());
         }
         Ok(())

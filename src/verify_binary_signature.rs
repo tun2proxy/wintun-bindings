@@ -4,21 +4,21 @@ use std::mem::size_of;
 use std::os::windows::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::ptr::null_mut;
-use windows_sys::core::PCWSTR;
 use windows_sys::Win32::Foundation::{
-    FreeLibrary, GetLastError, CRYPT_E_SECURITY_SETTINGS, ERROR_SUCCESS, TRUST_E_EXPLICIT_DISTRUST,
+    CRYPT_E_SECURITY_SETTINGS, ERROR_SUCCESS, FreeLibrary, GetLastError, TRUST_E_EXPLICIT_DISTRUST,
     TRUST_E_NOSIGNATURE, TRUST_E_PROVIDER_UNKNOWN, TRUST_E_SUBJECT_FORM_UNKNOWN, TRUST_E_SUBJECT_NOT_TRUSTED,
 };
 use windows_sys::Win32::Security::Cryptography::{
-    CertFindCertificateInStore, CertFreeCertificateContext, CertGetNameStringW, CryptMsgGetParam, CryptQueryObject,
     CERT_FIND_SUBJECT_CERT, CERT_INFO, CERT_NAME_SIMPLE_DISPLAY_TYPE, CERT_QUERY_CONTENT_FLAG_PKCS7_SIGNED_EMBED,
     CERT_QUERY_FORMAT_FLAG_BINARY, CERT_QUERY_OBJECT_FILE, CMSG_SIGNER_INFO, CMSG_SIGNER_INFO_PARAM,
+    CertFindCertificateInStore, CertFreeCertificateContext, CertGetNameStringW, CryptMsgGetParam, CryptQueryObject,
 };
 use windows_sys::Win32::Security::WinTrust::{
-    WinVerifyTrust, WINTRUST_ACTION_GENERIC_VERIFY_V2, WINTRUST_DATA, WINTRUST_DATA_0, WINTRUST_FILE_INFO,
-    WTD_CHOICE_FILE, WTD_REVOKE_NONE, WTD_STATEACTION_CLOSE, WTD_STATEACTION_VERIFY, WTD_UI_NONE,
+    WINTRUST_ACTION_GENERIC_VERIFY_V2, WINTRUST_DATA, WINTRUST_DATA_0, WINTRUST_FILE_INFO, WTD_CHOICE_FILE,
+    WTD_REVOKE_NONE, WTD_STATEACTION_CLOSE, WTD_STATEACTION_VERIFY, WTD_UI_NONE, WinVerifyTrust,
 };
 use windows_sys::Win32::System::LibraryLoader::{GetModuleFileNameW, LoadLibraryW};
+use windows_sys::core::PCWSTR;
 
 /// Verify the embedded signature of a PE file. ref:
 /// https://learn.microsoft.com/en-us/windows/win32/seccrypto/example-c-program--verifying-the-signature-of-a-pe-file
@@ -69,9 +69,7 @@ where
     const _ERROR_SUCCESS: i32 = ERROR_SUCCESS as _;
 
     let res = match l_status {
-        _ERROR_SUCCESS => {
-            Ok(())
-        }
+        _ERROR_SUCCESS => Ok(()),
         TRUST_E_NOSIGNATURE => {
             let dw_last_error = unsafe { GetLastError() } as i32;
             let err = if dw_last_error == TRUST_E_NOSIGNATURE
@@ -87,17 +85,11 @@ where
         TRUST_E_EXPLICIT_DISTRUST => Err(std::io::Error::other(
             "The signature is present, but specifically disallowed.",
         )),
-        TRUST_E_SUBJECT_NOT_TRUSTED => Err(std::io::Error::other(
-            "The signature is present, but not trusted.",
+        TRUST_E_SUBJECT_NOT_TRUSTED => Err(std::io::Error::other("The signature is present, but not trusted.")),
+        CRYPT_E_SECURITY_SETTINGS => Err(std::io::Error::other(
+            "The hash representing the subject or the publisher wasn't explicitly trusted by the admin and admin policy has disabled user trust. No signature, publisher or timestamp errors.",
         )),
-        CRYPT_E_SECURITY_SETTINGS => {
-            Err(std::io::Error::other(
-                "The hash representing the subject or the publisher wasn't explicitly trusted by the admin and admin policy has disabled user trust. No signature, publisher or timestamp errors.",
-            ))
-        }
-        _ => {
-            Err(std::io::Error::from_raw_os_error(l_status))
-        }
+        _ => Err(std::io::Error::from_raw_os_error(l_status)),
     };
 
     // Any hWVTStateData must be released by a call with close.
@@ -243,8 +235,8 @@ where
     //        which is not desirable, but we haven't a better way to avoid it yet.
     let lib = unsafe { LoadLibraryW(wide_filename.as_ptr() as PCWSTR) };
     let mut buf = [0u16; 1024];
-    let len = GetModuleFileNameW(lib, &mut buf as *mut _ as *mut _, buf.len() as _) as usize;
-    FreeLibrary(lib);
+    let len = unsafe { GetModuleFileNameW(lib, &mut buf as *mut _ as *mut _, buf.len() as _) } as usize;
+    unsafe { FreeLibrary(lib) };
     if len == 0 {
         return Err(std::io::Error::last_os_error());
     }

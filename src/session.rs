@@ -1,11 +1,12 @@
 use crate::{
+    Adapter, Error, Wintun,
     handle::{SafeEvent, UnsafeHandle},
-    packet, util, wintun_raw, Adapter, Error, Wintun,
+    packet, util, wintun_raw,
 };
 use std::{ptr, slice, sync::Arc, sync::OnceLock};
 use windows_sys::Win32::{
-    Foundation::{GetLastError, ERROR_NO_MORE_ITEMS, FALSE, HANDLE, WAIT_EVENT, WAIT_FAILED, WAIT_OBJECT_0},
-    System::Threading::{WaitForMultipleObjects, INFINITE},
+    Foundation::{ERROR_NO_MORE_ITEMS, FALSE, GetLastError, HANDLE, WAIT_EVENT, WAIT_FAILED, WAIT_OBJECT_0},
+    System::Threading::{INFINITE, WaitForMultipleObjects},
 };
 
 /// Wrapper around a <https://git.zx2c4.com/wintun/about/#wintun_session_handle>
@@ -129,7 +130,7 @@ impl Session {
 
     pub fn wait_read(&self) -> Result<(), Error> {
         //Wait on both the read handle and the shutdown handle so that we stop when requested
-        let handles = [self.get_read_wait_event()?.0, self.shutdown_event.0 .0];
+        let handles = [self.get_read_wait_event()?.0, self.shutdown_event.0.0];
         let result = unsafe {
             //SAFETY: We abide by the requirements of WaitForMultipleObjects, handles is a
             //pointer to valid, aligned, stack memory

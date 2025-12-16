@@ -4,11 +4,12 @@
 /// The [`Adapter::create`] and [`Adapter::open`] functions serve as the entry point to using
 /// wintun functionality
 use crate::{
+    Wintun,
     error::{Error, OutOfRangeData},
     handle::{SafeEvent, UnsafeHandle},
     session::Session,
     util::{self},
-    wintun_raw, Wintun,
+    wintun_raw,
 };
 use std::{
     ffi::OsStr,
@@ -19,8 +20,8 @@ use std::{
     sync::OnceLock,
 };
 use windows_sys::{
-    core::GUID,
     Win32::NetworkManagement::{IpHelper::ConvertLengthToIpv4Mask, Ndis::NET_LUID_LH},
+    core::GUID,
 };
 
 /// Wrapper around a <https://git.zx2c4.com/wintun/about/#wintun_adapter_handle>
@@ -94,7 +95,9 @@ impl Adapter {
                 let real_guid_s = util::guid_to_win_style_string(&GUID::from_u128(real_guid))?;
                 let guid_s = util::guid_to_win_style_string(&GUID::from_u128(guid))?;
                 let (major, minor, build) = util::get_windows_version()?;
-                log::warn!("Windows {major}.{minor}.{build} internal bug cause the GUID mismatch: Expected {guid_s}, got {real_guid_s}");
+                log::warn!(
+                    "Windows {major}.{minor}.{build} internal bug cause the GUID mismatch: Expected {guid_s}, got {real_guid_s}"
+                );
                 guid = real_guid;
             }
             Ok(Arc::new(Adapter {
@@ -442,7 +445,7 @@ impl Drop for Adapter {
 /// This function is used to avoid the adapter name and guid being recorded in the registry
 #[cfg(feature = "winreg")]
 pub(crate) fn delete_adapter_info_from_reg(dev_name: &str) -> std::io::Result<()> {
-    use winreg::{enums::HKEY_LOCAL_MACHINE, enums::KEY_ALL_ACCESS, RegKey};
+    use winreg::{RegKey, enums::HKEY_LOCAL_MACHINE, enums::KEY_ALL_ACCESS};
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
     let profiles_key = hklm.open_subkey_with_flags(
         "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\NetworkList\\Profiles",

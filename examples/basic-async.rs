@@ -1,8 +1,8 @@
 use futures::AsyncReadExt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use wintun_bindings::{
-    get_running_driver_version, get_wintun_bin_pattern_path, load_from_path, Adapter, AsyncSession, BoxError, Error,
-    MAX_RING_CAPACITY,
+    Adapter, AsyncSession, BoxError, Error, MAX_RING_CAPACITY, get_running_driver_version, get_wintun_bin_pattern_path,
+    load_from_path,
 };
 
 static RUNNING: AtomicBool = AtomicBool::new(true);

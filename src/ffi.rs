@@ -1,8 +1,8 @@
-use windows_sys::core::GUID;
 use windows_sys::Win32::NetworkManagement::IpHelper::{
     ConvertInterfaceAliasToLuid, ConvertInterfaceLuidToAlias, ConvertInterfaceLuidToGuid, ConvertInterfaceLuidToIndex,
 };
 use windows_sys::Win32::NetworkManagement::Ndis::{IF_MAX_STRING_SIZE, NET_LUID_LH};
+use windows_sys::core::GUID;
 
 pub fn luid_to_alias(luid: &NET_LUID_LH) -> std::io::Result<String> {
     let mut alias = vec![0; IF_MAX_STRING_SIZE as usize + 1];

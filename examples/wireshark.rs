@@ -15,7 +15,7 @@ use windows_sys::Win32::{
     NetworkManagement::IpHelper::{GetBestRoute, MIB_IPFORWARDROW},
     Networking::WinSock::{AF_INET, AF_INET6, SOCKADDR_INET},
 };
-use wintun_bindings::{format_message, get_wintun_bin_pattern_path, BoxError, Error};
+use wintun_bindings::{BoxError, Error, format_message, get_wintun_bin_pattern_path};
 
 static RUNNING: AtomicBool = AtomicBool::new(true);
 
