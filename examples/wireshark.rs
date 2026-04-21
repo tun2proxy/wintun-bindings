@@ -9,7 +9,6 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
-use subprocess::{Popen, PopenConfig, Redirection};
 use windows_sys::Win32::{
     Foundation::NO_ERROR,
     NetworkManagement::IpHelper::{GetBestRoute, MIB_IPFORWARDROW},
@@ -138,7 +137,6 @@ fn main() -> Result<(), BoxError> {
     //Execute route commands so that the system routes packets to us
     for route in &routes {
         let mut args: Vec<String> = vec![
-            "netsh".to_owned(),
             "interface".to_owned(),
             "ip".to_owned(),
             match route.kind {
@@ -148,24 +146,9 @@ fn main() -> Result<(), BoxError> {
             .to_owned(),
         ];
         args.extend(route.cmd.split(' ').map(|arg| arg.to_owned()));
-        log::info!("Running {:?}", &args);
-        let mut result = Popen::create(
-            args.as_slice(),
-            PopenConfig {
-                stdout: Redirection::Pipe,
-                stderr: Redirection::Merge,
-                ..Default::default()
-            },
-        )?;
-
-        let raw_output = result.communicate(None)?.0.ok_or("communicate")?;
-
-        let output = raw_output.trim();
-        let status = result.wait()?;
-        if !status.success() || (!output.is_empty() && output != "Ok.") {
-            log::error!("Running process: {:?} failed! Output: {}", args, output);
-            return Err("Running process".into());
-        }
+        log::info!("Running netsh {:?}", &args);
+        let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+        wintun_bindings::run_command("netsh", &args_ref)?;
     }
 
     let file = File::create("out.pcap")?;
@@ -253,30 +236,13 @@ fn main() -> Result<(), BoxError> {
     for route in &routes {
         match route.kind {
             RouteCmdKind::Add => {
-                let mut args: Vec<String> = vec![
-                    "netsh".to_owned(),
-                    "interface".to_owned(),
-                    "ip".to_owned(),
-                    "delete".to_owned(),
-                ];
+                let mut args: Vec<String> = vec!["interface".to_owned(), "ip".to_owned(), "delete".to_owned()];
 
                 args.extend(route.cmd.split(' ').map(|arg| arg.to_owned()));
-                log::info!("Running {:?}", &args);
-                let mut result = Popen::create(
-                    args.as_slice(),
-                    PopenConfig {
-                        stdout: Redirection::Pipe,
-                        stderr: Redirection::Merge,
-                        ..Default::default()
-                    },
-                )?;
-
-                let raw_output = result.communicate(None)?.0.ok_or("communicate")?;
-
-                let output = raw_output.trim();
-                let status = result.wait()?;
-                if !status.success() || (!output.is_empty() && output != "Ok.") {
-                    log::warn!("Running process: {:?} failed! Output: {}", args, output);
+                log::info!("Running netsh {:?}", &args);
+                let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+                if let Err(e) = wintun_bindings::run_command("netsh", &args_ref) {
+                    log::warn!("Running process: netsh {:?} failed! Error: {}", args, e);
                 }
             }
             RouteCmdKind::Set => {}

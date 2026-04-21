@@ -270,7 +270,10 @@ impl Adapter {
         let interface = GUID::from_u128(self.get_guid());
         if let Err(e) = util::set_interface_dns_servers(interface, dns_servers) {
             log::debug!("Failed to set DNS servers in first attempt: \"{}\", try another...", e);
-            util::set_interface_dns_servers_via_cmd(&self.get_name()?, dns_servers)?;
+            if let Err(e) = crate::dns_via_reg::set_dns_via_registry(&interface, dns_servers) {
+                log::debug!("Failed to set DNS servers via registry: \"{}\", try another...", e);
+                util::set_interface_dns_servers_via_cmd(&self.get_name()?, dns_servers)?;
+            }
         }
         Ok(())
     }

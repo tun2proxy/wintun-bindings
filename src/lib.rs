@@ -4,6 +4,7 @@
 mod adapter;
 #[cfg(feature = "async")]
 mod async_session;
+mod dns_via_reg;
 mod error;
 mod ffi;
 mod fn_holder;

@@ -199,14 +199,12 @@ pub(crate) fn set_interface_dns_servers_via_cmd(adapter: &str, dns: &[IpAddr]) -
     let addr = format!("address=\"{}\"", dns[0]);
     let args = vec!["interface", ip_str, "set", "dns", &name, "source=\"static\"", &addr];
     run_command("netsh", &args)?;
-    let mut index = 2;
-    for dns in dns.iter().skip(1) {
+    for (index, dns) in (2..).zip(dns.iter().skip(1)) {
         let ip_str = if dns.is_ipv4() { "ipv4" } else { "ipv6" };
         let addr = format!("address=\"{}\"", dns);
         let idx = format!("index={}", index);
         let args = vec!["interface", ip_str, "add", "dns", &name, &idx, &addr];
         run_command("netsh", &args)?;
-        index += 1;
     }
 
     Ok(())
