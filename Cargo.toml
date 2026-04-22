@@ -1,6 +1,6 @@
 [package]
 name = "wintun-bindings"
-version = "0.7.34"
+version = "0.7.35"
 edition = "2024"
 authors = [
     "ssrlive",
