@@ -448,19 +448,125 @@ impl Drop for Adapter {
 /// This function is used to avoid the adapter name and guid being recorded in the registry
 #[cfg(feature = "winreg")]
 pub(crate) fn delete_adapter_info_from_reg(dev_name: &str) -> std::io::Result<()> {
-    use winreg::{RegKey, enums::HKEY_LOCAL_MACHINE, enums::KEY_ALL_ACCESS};
-    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let profiles_key = hklm.open_subkey_with_flags(
+    use windows_sys::Win32::Foundation::ERROR_NO_MORE_ITEMS;
+    use windows_sys::Win32::System::Registry::{
+        HKEY, HKEY_LOCAL_MACHINE, KEY_ALL_ACCESS, KEY_READ, REG_SZ, RegCloseKey, RegDeleteTreeW, RegEnumKeyExW,
+        RegOpenKeyExW, RegQueryValueExW,
+    };
+
+    fn to_wide_null(value: &str) -> Vec<u16> {
+        value.encode_utf16().chain(std::iter::once(0)).collect()
+    }
+
+    fn open_registry_key(parent: HKEY, subkey: &str, access: u32) -> std::io::Result<HKEY> {
+        let subkey_wide = to_wide_null(subkey);
+        let mut handle: HKEY = std::ptr::null_mut();
+        let status = unsafe { RegOpenKeyExW(parent, subkey_wide.as_ptr(), 0, access, &mut handle) };
+        if status != 0 {
+            return Err(std::io::Error::from_raw_os_error(status as i32));
+        }
+        Ok(handle)
+    }
+
+    fn enum_registry_subkeys(hkey: HKEY) -> std::io::Result<Vec<String>> {
+        let mut subkeys = Vec::new();
+        let mut index = 0;
+        loop {
+            let mut name = vec![0u16; 260];
+            let mut name_len = name.len() as u32;
+            let status = unsafe {
+                RegEnumKeyExW(
+                    hkey,
+                    index,
+                    name.as_mut_ptr(),
+                    &mut name_len,
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                )
+            };
+            if status == ERROR_NO_MORE_ITEMS {
+                break;
+            }
+            if status != 0 {
+                return Err(std::io::Error::from_raw_os_error(status as i32));
+            }
+            subkeys.push(String::from_utf16_lossy(&name[..name_len as usize]));
+            index += 1;
+        }
+        Ok(subkeys)
+    }
+
+    fn query_registry_string_value(hkey: HKEY, value_name: &str) -> std::io::Result<String> {
+        let value_name_wide = to_wide_null(value_name);
+        let mut value_type = 0_u32;
+        let mut data_len = 0_u32;
+        let status = unsafe {
+            RegQueryValueExW(
+                hkey,
+                value_name_wide.as_ptr(),
+                std::ptr::null_mut(),
+                &mut value_type,
+                std::ptr::null_mut(),
+                &mut data_len,
+            )
+        };
+        if status != 0 {
+            return Err(std::io::Error::from_raw_os_error(status as i32));
+        }
+        if value_type != REG_SZ {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Registry value is not a string",
+            ));
+        }
+        let mut buffer = vec![0u16; (data_len as usize / 2).max(1)];
+        let status = unsafe {
+            RegQueryValueExW(
+                hkey,
+                value_name_wide.as_ptr(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                buffer.as_mut_ptr().cast(),
+                &mut data_len,
+            )
+        };
+        if status != 0 {
+            return Err(std::io::Error::from_raw_os_error(status as i32));
+        }
+        if let Some(&0) = buffer.last() {
+            buffer.pop();
+        }
+        String::from_utf16(&buffer).map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))
+    }
+
+    fn read_subkey_string_value(parent_key: HKEY, subkey_name: &str, value_name: &str) -> std::io::Result<String> {
+        let subkey_handle = open_registry_key(parent_key, subkey_name, KEY_READ)?;
+        let value = query_registry_string_value(subkey_handle, value_name);
+        unsafe { RegCloseKey(subkey_handle) };
+        value
+    }
+
+    fn delete_registry_tree(parent_key: HKEY, subkey_name: &str) -> std::io::Result<()> {
+        let subkey_wide = to_wide_null(subkey_name);
+        let status = unsafe { RegDeleteTreeW(parent_key, subkey_wide.as_ptr()) };
+        if status != 0 {
+            return Err(std::io::Error::from_raw_os_error(status as i32));
+        }
+        Ok(())
+    }
+
+    let profiles_key = open_registry_key(
+        HKEY_LOCAL_MACHINE,
         "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\NetworkList\\Profiles",
         KEY_ALL_ACCESS,
     )?;
-
-    for sub_key_name in profiles_key.enum_keys().filter_map(Result::ok) {
-        let sub_key = profiles_key.open_subkey(&sub_key_name)?;
-        match sub_key.get_value::<String, _>("ProfileName") {
+    for sub_key_name in enum_registry_subkeys(profiles_key)? {
+        match read_subkey_string_value(profiles_key, &sub_key_name, "ProfileName") {
             Ok(profile_name) => {
                 if dev_name == profile_name {
-                    match profiles_key.delete_subkey_all(&sub_key_name) {
+                    match delete_registry_tree(profiles_key, &sub_key_name) {
                         Ok(_) => log::info!("Successfully deleted Profiles sub_key: {}", sub_key_name),
                         Err(e) => log::warn!("Failed to delete Profiles sub_key {}: {}", sub_key_name, e),
                     }
@@ -469,16 +575,18 @@ pub(crate) fn delete_adapter_info_from_reg(dev_name: &str) -> std::io::Result<()
             Err(e) => log::warn!("Failed to read ProfileName for sub_key {}: {}", sub_key_name, e),
         }
     }
-    let unmanaged_key = hklm.open_subkey_with_flags(
+    unsafe { RegCloseKey(profiles_key) };
+
+    let unmanaged_key = open_registry_key(
+        HKEY_LOCAL_MACHINE,
         "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\NetworkList\\Signatures\\Unmanaged",
         KEY_ALL_ACCESS,
     )?;
-    for sub_key_name in unmanaged_key.enum_keys().filter_map(Result::ok) {
-        let sub_key = unmanaged_key.open_subkey(&sub_key_name)?;
-        match sub_key.get_value::<String, _>("Description") {
+    for sub_key_name in enum_registry_subkeys(unmanaged_key)? {
+        match read_subkey_string_value(unmanaged_key, &sub_key_name, "Description") {
             Ok(description) => {
                 if dev_name == description {
-                    match unmanaged_key.delete_subkey_all(&sub_key_name) {
+                    match delete_registry_tree(unmanaged_key, &sub_key_name) {
                         Ok(_) => log::info!("Successfully deleted Unmanaged sub_key: {}", sub_key_name),
                         Err(e) => log::warn!("Failed to delete Unmanaged sub_key {}: {}", sub_key_name, e),
                     }
@@ -487,5 +595,7 @@ pub(crate) fn delete_adapter_info_from_reg(dev_name: &str) -> std::io::Result<()
             Err(e) => log::warn!("Failed to read Description for sub_key {}: {}", sub_key_name, e),
         }
     }
+    unsafe { RegCloseKey(unmanaged_key) };
+
     Ok(())
 }
