@@ -503,14 +503,3 @@ pub fn decode_utf16(string: &[u16]) -> String {
     let end = string.iter().position(|b| *b == 0).unwrap_or(string.len());
     String::from_utf16_lossy(&string[..end])
 }
-
-#[repr(C, align(1))]
-#[derive(c2rust_bitfields::BitfieldStruct)]
-#[allow(non_snake_case)]
-#[allow(non_camel_case_types)]
-struct _NET_LUID_LH_INFO {
-    #[bitfield(name = "Reserved", ty = "u64", bits = "0..=23")]
-    #[bitfield(name = "NetLuidIndex", ty = "u64", bits = "24..=47")]
-    #[bitfield(name = "IfType", ty = "u64", bits = "48..=63")]
-    _Value: [u8; 8],
-}
