@@ -20,7 +20,10 @@ use std::{
     sync::OnceLock,
 };
 use windows_sys::{
-    Win32::NetworkManagement::{IpHelper::ConvertLengthToIpv4Mask, Ndis::NET_LUID_LH},
+    Win32::{
+        Foundation::ERROR_NOT_FOUND,
+        NetworkManagement::{IpHelper::ConvertLengthToIpv4Mask, Ndis::NET_LUID_LH},
+    },
     core::GUID,
 };
 
@@ -607,14 +610,13 @@ pub(crate) fn delete_adapter_info_from_reg(dev_name: &str) -> std::io::Result<()
 }
 
 fn resolve_with_retry<T>(mut f: impl FnMut() -> std::io::Result<T>) -> std::io::Result<T> {
-    const ERROR_NOT_FOUND: i32 = 1168;
-    const NSI_RETRY_ATTEMPTS: u32 = 3;
+    const NSI_RETRY_ATTEMPTS: usize = 3;
     const NSI_RETRY_DELAY_MS: u64 = 25;
 
     for attempt in 1..=NSI_RETRY_ATTEMPTS {
         match f() {
             Ok(v) => return Ok(v),
-            Err(e) if e.raw_os_error() == Some(ERROR_NOT_FOUND) => {
+            Err(e) if e.raw_os_error() == Some(ERROR_NOT_FOUND as i32) => {
                 if attempt == NSI_RETRY_ATTEMPTS {
                     return Err(e);
                 }
