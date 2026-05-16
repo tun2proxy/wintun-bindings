@@ -61,25 +61,35 @@ impl Adapter {
     }
 
     pub fn get_guid(&self) -> u128 {
-        *self.guid.get_or_init(|| {
-            let real_guid = match resolve_with_retry(|| crate::ffi::luid_to_guid(&self.luid)) {
-                Ok(g) => util::win_guid_to_u128(&g),
-                Err(_) => return self.requested_guid.unwrap_or(0),
-            };
-            if let Some(req) = self.requested_guid
-                && req != real_guid
-                && let (Ok(real_s), Ok(req_s), Ok((major, minor, build))) = (
-                    util::guid_to_win_style_string(&GUID::from_u128(real_guid)),
-                    util::guid_to_win_style_string(&GUID::from_u128(req)),
-                    util::get_windows_version(),
-                )
-            {
-                log::warn!(
-                    "Windows {major}.{minor}.{build} internal bug cause the GUID mismatch: Expected {req_s}, got {real_s}"
-                );
-            }
-            real_guid
-        })
+        if let Some(guid) = self.guid.get() {
+            return *guid;
+        }
+
+        let real_guid = match resolve_with_retry(|| crate::ffi::luid_to_guid(&self.luid)) {
+            Ok(g) => util::win_guid_to_u128(&g),
+            Err(_) => return self.requested_guid.unwrap_or(0),
+        };
+
+        if let Some(req) = self.requested_guid
+            && req != real_guid
+            && let (Ok(real_s), Ok(req_s), Ok((major, minor, build))) = (
+                util::guid_to_win_style_string(&GUID::from_u128(real_guid)),
+                util::guid_to_win_style_string(&GUID::from_u128(req)),
+                util::get_windows_version(),
+            )
+        {
+            log::warn!(
+                "Windows {major}.{minor}.{build}: an internal bug causes the GUID mismatch: Expected {req_s}, got {real_s}"
+            );
+        }
+
+        match self.guid.set(real_guid) {
+            Ok(()) => real_guid,
+            Err(_) => *self
+                .guid
+                .get()
+                .expect("guid should be initialized by this thread or another"),
+        }
     }
 
     /// Creates a new wintun adapter inside the name `name` with tunnel type `tunnel_type`
@@ -601,16 +611,18 @@ fn resolve_with_retry<T>(mut f: impl FnMut() -> std::io::Result<T>) -> std::io::
     const NSI_RETRY_ATTEMPTS: u32 = 3;
     const NSI_RETRY_DELAY_MS: u64 = 25;
 
-    for attempt in 1..NSI_RETRY_ATTEMPTS {
+    for attempt in 1..=NSI_RETRY_ATTEMPTS {
         match f() {
             Ok(v) => return Ok(v),
             Err(e) if e.raw_os_error() == Some(ERROR_NOT_FOUND) => {
+                if attempt == NSI_RETRY_ATTEMPTS {
+                    return Err(e);
+                }
                 log::warn!("NSI race, retry {attempt}/{NSI_RETRY_ATTEMPTS}");
                 std::thread::sleep(std::time::Duration::from_millis(NSI_RETRY_DELAY_MS));
             }
             Err(e) => return Err(e),
         }
     }
-
-    f()
+    unreachable!();
 }
