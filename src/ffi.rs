@@ -1,5 +1,5 @@
 use windows_sys::Win32::NetworkManagement::IpHelper::{
-    ConvertInterfaceAliasToLuid, ConvertInterfaceLuidToAlias, ConvertInterfaceLuidToGuid, ConvertInterfaceLuidToIndex,
+    ConvertInterfaceLuidToAlias, ConvertInterfaceLuidToGuid, ConvertInterfaceLuidToIndex,
 };
 use windows_sys::Win32::NetworkManagement::Ndis::{IF_MAX_STRING_SIZE, NET_LUID_LH};
 use windows_sys::core::GUID;
@@ -14,15 +14,6 @@ pub fn luid_to_alias(luid: &NET_LUID_LH) -> std::io::Result<String> {
     Ok(crate::util::decode_utf16(&r))
 }
 
-pub fn alias_to_luid(alias: &str) -> std::io::Result<NET_LUID_LH> {
-    let alias = alias.encode_utf16().chain(std::iter::once(0)).collect::<Vec<_>>();
-    let mut luid = unsafe { std::mem::zeroed() };
-
-    match unsafe { ConvertInterfaceAliasToLuid(alias.as_ptr(), &mut luid) } {
-        0 => Ok(luid),
-        err => Err(std::io::Error::from_raw_os_error(err as _)),
-    }
-}
 pub fn luid_to_index(luid: &NET_LUID_LH) -> std::io::Result<u32> {
     let mut index = 0;
 
