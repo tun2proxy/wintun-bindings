@@ -205,8 +205,15 @@ impl Adapter {
     /// Set `MTU` of this adapter
     pub fn set_mtu(&self, mtu: usize) -> Result<(), Error> {
         util::set_adapter_mtu(&self.luid, mtu, false)?;
-        // FIXME: Here we set the IPv6 MTU as well for consistency, but for some users it may not be expected.
-        util::set_adapter_mtu(&self.luid, mtu, true)?;
+        // IPv6 MTU is best-effort: a host with IPv6 disabled has no IPv6
+        // interface row. Skip that case rather than fail, since the adapter
+        // may be driven IPv4-only.
+        if let Err(e) = util::set_adapter_mtu(&self.luid, mtu, true) {
+            if e.raw_os_error() != Some(ERROR_NOT_FOUND as i32) {
+                return Err(e.into());
+            }
+            log::warn!("skipping IPv6 MTU, no IPv6 interface row");
+        }
         Ok(())
     }
 
