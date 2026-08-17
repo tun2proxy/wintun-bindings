@@ -198,13 +198,13 @@ pub(crate) fn set_interface_dns_servers_via_cmd(adapter: &str, dns: &[IpAddr]) -
     let name = format!("name=\"{}\"", adapter);
     let addr = format!("address=\"{}\"", dns[0]);
     let args = vec!["interface", ip_str, "set", "dns", &name, "source=\"static\"", &addr];
-    run_command("netsh", &args)?;
+    run_command("netsh", &args, false)?;
     for (index, dns) in (2..).zip(dns.iter().skip(1)) {
         let ip_str = if dns.is_ipv4() { "ipv4" } else { "ipv6" };
         let addr = format!("address=\"{}\"", dns);
         let idx = format!("index={}", index);
         let args = vec!["interface", ip_str, "add", "dns", &name, &idx, &addr];
-        run_command("netsh", &args)?;
+        run_command("netsh", &args, false)?;
     }
 
     Ok(())
@@ -475,10 +475,13 @@ fn get_ip_interface(luid: &NET_LUID_LH, is_ipv6: bool) -> std::io::Result<MIB_IP
 }
 
 /// Runs a command and returns an error if the command fails, just convenience for users.
-pub fn run_command(command: &str, args: &[&str]) -> std::io::Result<Vec<u8>> {
+#[doc(hidden)]
+pub fn run_command(command: &str, args: &[&str], show_console: bool) -> std::io::Result<Vec<u8>> {
     let full_cmd = format!("{} {}", command, args.join(" "));
     log::debug!("Running command: \"{full_cmd}\"...");
-    let out = match std::process::Command::new(command).args(args).output() {
+    let flags = if show_console { 0x00000010 } else { 0x08000000 };
+    use std::{os::windows::process::CommandExt, process::Command};
+    let out = match Command::new(command).args(args).creation_flags(flags).output() {
         Ok(out) => out,
         Err(e) => {
             let e2 = e.to_string().trim().to_string();

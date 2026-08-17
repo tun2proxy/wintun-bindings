@@ -148,7 +148,7 @@ fn main() -> Result<(), BoxError> {
         args.extend(route.cmd.split(' ').map(|arg| arg.to_owned()));
         log::info!("Running netsh {:?}", &args);
         let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-        wintun_bindings::run_command("netsh", &args_ref)?;
+        wintun_bindings::run_command("netsh", &args_ref, false)?;
     }
 
     let file = File::create("out.pcap")?;
@@ -241,7 +241,7 @@ fn main() -> Result<(), BoxError> {
                 args.extend(route.cmd.split(' ').map(|arg| arg.to_owned()));
                 log::info!("Running netsh {:?}", &args);
                 let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-                if let Err(e) = wintun_bindings::run_command("netsh", &args_ref) {
+                if let Err(e) = wintun_bindings::run_command("netsh", &args_ref, false) {
                     log::warn!("Running process: netsh {:?} failed! Error: {}", args, e);
                 }
             }

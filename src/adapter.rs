@@ -58,7 +58,7 @@ impl Adapter {
             &format!("name=\"{}\"", self.get_name()?),
             &format!("newname=\"{}\"", name),
         ];
-        util::run_command("netsh", args)?;
+        util::run_command("netsh", args, false)?;
 
         Ok(())
     }
@@ -322,7 +322,7 @@ impl Adapter {
         if let Some(gateway) = gateway {
             args.push(format!("gateway={}", gateway));
         }
-        util::run_command("netsh", &args.iter().map(|s| s.as_str()).collect::<Vec<&str>>())?;
+        util::run_command("netsh", &args.iter().map(|s| s.as_str()).collect::<Vec<&str>>(), false)?;
         Ok(())
     }
 

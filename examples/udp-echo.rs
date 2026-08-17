@@ -75,7 +75,7 @@ fn main() -> Result<(), BoxError> {
 
     // set metric command: `netsh interface ipv4 set interface adapter_name metric=255`
     let args = &["interface", "ipv4", "set", "interface", adapter_name, "metric=255"];
-    run_command("netsh", args)?;
+    run_command("netsh", args, false)?;
     println!("netsh {}", args.join(" "));
 
     // Execute the network card initialization command, setting virtual network card information
@@ -91,7 +91,7 @@ fn main() -> Result<(), BoxError> {
         "10.28.13.2/24",
         "gateway=10.28.13.1",
     ];
-    run_command("netsh", args)?;
+    run_command("netsh", args, false)?;
     println!("netsh {}", args.join(" "));
 
     let dns = "8.8.8.8".parse::<IpAddr>().unwrap();
