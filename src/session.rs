@@ -109,7 +109,7 @@ impl Session {
 
     /// Blocks until a packet is available, returning the next packet in the receive queue once this happens.
     /// If the session is closed via [`Session::shutdown`] all threads currently blocking inside this function
-    /// will return Err(())
+    /// will return [`Error::ShuttingDown`]
     pub fn receive_blocking(self: &Arc<Self>) -> Result<packet::Packet, Error> {
         loop {
             //Try 5 times to receive without blocking so we don't have to issue a syscall to wait
@@ -128,6 +128,7 @@ impl Session {
         }
     }
 
+    /// Blocks until data is available to read, or returns [`Error::ShuttingDown`] once [`Session::shutdown`] is called
     pub fn wait_read(&self) -> Result<(), Error> {
         //Wait on both the read handle and the shutdown handle so that we stop when requested
         let handles = [self.get_read_wait_event()?.0, self.shutdown_event.0.0];
@@ -154,7 +155,8 @@ impl Session {
         }
     }
 
-    /// Cancels any active calls to [`Session::receive_blocking`] making them instantly return Err(_) so that session can be shutdown cleanly
+    /// Cancels any active calls to [`Session::receive_blocking`], [`Session::recv`] and [`Session::wait_read`],
+    /// making them instantly return [`Error::ShuttingDown`] so that session can be shutdown cleanly
     pub fn shutdown(&self) -> Result<(), Error> {
         self.shutdown_event.set_event()?;
         Ok(())
@@ -189,7 +191,18 @@ impl Session {
 
     /// Blocks until a packet is available, returning the next packet in the receive queue once this happens.
     /// If the session is closed via [`Session::shutdown`] all threads currently blocking inside this function
-    /// will return Err(())
+    /// will return an [`std::io::Error`] that wraps [`Error::ShuttingDown`]. It can be told apart from other errors:
+    ///
+    /// ```
+    /// fn is_shutting_down(err: &std::io::Error) -> bool {
+    ///     matches!(
+    ///         err.get_ref().and_then(|e| e.downcast_ref::<wintun_bindings::Error>()),
+    ///         Some(wintun_bindings::Error::ShuttingDown)
+    ///     )
+    /// }
+    /// assert!(is_shutting_down(&wintun_bindings::Error::ShuttingDown.into()));
+    /// assert!(!is_shutting_down(&std::io::ErrorKind::BrokenPipe.into()));
+    /// ```
     pub fn recv(&self, buf: &mut [u8]) -> std::io::Result<usize> {
         loop {
             // Try 5 times to receive without blocking so we don't have to issue a syscall to wait

@@ -58,6 +58,8 @@ impl AsyncSession {
         }
     }
 
+    /// Receives the next packet. Once [`Session::shutdown`] is called, returns an [`std::io::Error`] that wraps
+    /// [`crate::Error::ShuttingDown`], see [`Session::recv`]
     pub async fn recv(&self, buf: &mut [u8]) -> std::io::Result<usize> {
         loop {
             match self.session.try_receive() {
