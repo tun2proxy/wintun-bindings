@@ -1,12 +1,14 @@
 use std::ffi::OsStr;
+use std::fs::File;
 use std::iter::once;
 use std::mem::size_of;
 use std::os::windows::ffi::OsStrExt;
-use std::path::PathBuf;
+use std::os::windows::io::AsRawHandle;
+use std::path::{Component, Path, PathBuf};
 use std::ptr::null_mut;
 use windows_sys::Win32::Foundation::{
-    CRYPT_E_SECURITY_SETTINGS, ERROR_SUCCESS, FreeLibrary, GetLastError, TRUST_E_EXPLICIT_DISTRUST,
-    TRUST_E_NOSIGNATURE, TRUST_E_PROVIDER_UNKNOWN, TRUST_E_SUBJECT_FORM_UNKNOWN, TRUST_E_SUBJECT_NOT_TRUSTED,
+    CRYPT_E_SECURITY_SETTINGS, ERROR_SUCCESS, GetLastError, TRUST_E_EXPLICIT_DISTRUST, TRUST_E_NOSIGNATURE,
+    TRUST_E_PROVIDER_UNKNOWN, TRUST_E_SUBJECT_FORM_UNKNOWN, TRUST_E_SUBJECT_NOT_TRUSTED,
 };
 use windows_sys::Win32::Security::Cryptography::{
     CERT_FIND_SUBJECT_CERT, CERT_INFO, CERT_NAME_SIMPLE_DISPLAY_TYPE, CERT_QUERY_CONTENT_FLAG_PKCS7_SIGNED_EMBED,
@@ -17,16 +19,15 @@ use windows_sys::Win32::Security::WinTrust::{
     WINTRUST_ACTION_GENERIC_VERIFY_V2, WINTRUST_DATA, WINTRUST_DATA_0, WINTRUST_FILE_INFO, WTD_CHOICE_FILE,
     WTD_REVOKE_NONE, WTD_STATEACTION_CLOSE, WTD_STATEACTION_VERIFY, WTD_UI_NONE, WinVerifyTrust,
 };
-use windows_sys::Win32::System::LibraryLoader::{GetModuleFileNameW, LoadLibraryW};
-use windows_sys::core::PCWSTR;
+use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ;
 
 /// Verify the embedded signature of a PE file. ref:
 /// https://learn.microsoft.com/en-us/windows/win32/seccrypto/example-c-program--verifying-the-signature-of-a-pe-file
-pub fn verify_signature<P>(source_file: P) -> std::io::Result<()>
-where
-    P: Into<PathBuf>,
-{
-    let pwsz_source_file = OsStr::new(&source_file.into())
+///
+/// When `file` is given, the file is read through that handle, which must be open on `source_file`.
+pub fn verify_signature(source_file: &Path, file: Option<&File>) -> std::io::Result<()> {
+    let pwsz_source_file = source_file
+        .as_os_str()
         .encode_wide()
         .chain(once(0))
         .collect::<Vec<u16>>();
@@ -34,7 +35,7 @@ where
     let mut file_data = WINTRUST_FILE_INFO {
         cbStruct: size_of::<WINTRUST_FILE_INFO>() as _,
         pcwszFilePath: pwsz_source_file.as_ptr(),
-        hFile: 0 as _,
+        hFile: file.map_or(null_mut(), File::as_raw_handle),
         pgKnownSubject: null_mut(),
     };
 
@@ -225,27 +226,45 @@ where
     Ok(res)
 }
 
-pub(crate) unsafe fn get_dll_absolute_path<P>(path: P) -> std::io::Result<std::path::PathBuf>
-where
-    P: AsRef<::std::ffi::OsStr>,
-{
-    let path = path.as_ref();
-    let wide_filename: Vec<u16> = path.encode_wide().chain(Some(0)).collect();
-    // FIXME: `LoadLibraryW` calling will execute the DLL's DllMain function,
-    //        which is not desirable, but we haven't a better way to avoid it yet.
-    let lib = unsafe { LoadLibraryW(wide_filename.as_ptr() as PCWSTR) };
-    let mut buf = [0u16; 1024];
-    let len = unsafe { GetModuleFileNameW(lib, &mut buf as *mut _ as *mut _, buf.len() as _) } as usize;
-    unsafe { FreeLibrary(lib) };
-    if len == 0 {
-        return Err(std::io::Error::last_os_error());
+/// Finds the file `load_from_path` should load, without loading it.
+///
+/// A relative path is looked up next to the executable, then in the current directory.
+/// As with `LoadLibraryW`, `.dll` is appended when the name has no extension.
+pub(crate) fn resolve_dll_path(path: &Path) -> std::io::Result<PathBuf> {
+    let mut path = path.to_path_buf();
+    if path.extension().is_none() {
+        path.set_extension("dll");
     }
-    use std::os::windows::ffi::OsStringExt;
-    let path2 = std::ffi::OsString::from_wide(&buf[..len])
-        .into_string()
-        .map_err(|e| std::io::Error::other(e.to_string_lossy()))?;
+    if path.is_absolute() {
+        return Ok(path);
+    }
+    // `\wintun.dll` and `C:wintun.dll` depend on the current drive, not on a directory.
+    if path.has_root() || matches!(path.components().next(), Some(Component::Prefix(_))) {
+        let msg = format!("Unsupported DLL path \"{}\"", path.display());
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, msg));
+    }
+    let exe_dir = std::env::current_exe()?.parent().map(Path::to_path_buf);
+    for dir in exe_dir.into_iter().chain(std::env::current_dir().ok()) {
+        let candidate = dir.join(&path);
+        if candidate.is_file() {
+            return Ok(candidate);
+        }
+    }
+    let msg = format!(
+        "\"{}\" not found next to the executable or in the current directory",
+        path.display()
+    );
+    Err(std::io::Error::new(std::io::ErrorKind::NotFound, msg))
+}
 
-    Ok(std::path::PathBuf::from(path2))
+/// Opens the file for reading and keeps it from being written, renamed or deleted while the
+/// handle is alive, so the file that was verified is the file that gets loaded.
+pub(crate) fn open_locked(path: &Path) -> std::io::Result<File> {
+    use std::os::windows::fs::OpenOptionsExt;
+    std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(FILE_SHARE_READ)
+        .open(path)
 }
 
 #[cfg(test)]
@@ -286,8 +305,59 @@ mod tests {
         let path = crate_dir.join(dll_path);
 
         // let path = get_wintun_bin_pattern_path().unwrap();
-        verify_signature(&path).unwrap();
+        verify_signature(&path, None).unwrap();
         let signer = get_signer_name(&path).unwrap();
         assert_eq!(signer, WINTUN_PROVIDER);
+    }
+
+    #[test]
+    fn resolve_dll_path_tests() {
+        let crate_dir = get_crate_dir("wintun-bindings").unwrap();
+        let dll_path = crate_dir.join(get_wintun_bin_pattern_path().unwrap());
+        assert_eq!(resolve_dll_path(&dll_path).unwrap(), dll_path);
+
+        // Tests run from the crate root, so the relative path is found in the current directory.
+        let relative = get_wintun_bin_pattern_path().unwrap();
+        let resolved = resolve_dll_path(&relative).unwrap();
+        assert!(resolved.is_absolute());
+        assert!(resolved.ends_with(&relative));
+
+        let without_ext = relative.with_extension("");
+        assert_eq!(resolve_dll_path(&without_ext).unwrap(), resolved);
+
+        for path in [r"\wintun.dll", "C:wintun.dll"] {
+            let err = resolve_dll_path(Path::new(path)).unwrap_err();
+            assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput, "{path}");
+        }
+
+        let err = resolve_dll_path(Path::new("no-such-wintun.dll")).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn open_locked_tests() {
+        let crate_dir = get_crate_dir("wintun-bindings").unwrap();
+        let path = crate_dir.join(get_wintun_bin_pattern_path().unwrap());
+
+        let file = open_locked(&path).unwrap();
+        verify_signature(&path, Some(&file)).unwrap();
+        assert_eq!(get_signer_name(&path).unwrap(), WINTUN_PROVIDER);
+        assert!(std::fs::OpenOptions::new().write(true).open(&path).is_err());
+        drop(file);
+        assert!(std::fs::OpenOptions::new().write(true).open(&path).is_ok());
+    }
+
+    #[test]
+    fn load_from_path_tests() {
+        // A relative path, as the examples pass it.
+        let wintun = unsafe { load_from_path(get_wintun_bin_pattern_path().unwrap()) }.unwrap();
+        drop(wintun);
+
+        let dir = std::env::temp_dir().join(format!("wintun-bindings-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let unsigned = dir.join("wintun.dll");
+        std::fs::write(&unsigned, b"MZ not a real dll").unwrap();
+        assert!(unsafe { load_from_path(&unsigned) }.is_err());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

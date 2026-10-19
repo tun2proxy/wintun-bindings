@@ -77,6 +77,8 @@ pub unsafe fn load() -> Result<Wintun, Error> {
 
 /// Attempts to load the Wintun library as a dynamic library from the given path.
 ///
+/// With the `verify_binary_signature` feature, the signature is checked before the file is loaded,
+/// and a relative path is looked up next to the executable, then in the current directory.
 ///
 /// # Safety
 /// This function loads a dll file with the path provided.
@@ -92,17 +94,21 @@ where
     P: AsRef<::std::ffi::OsStr>,
 {
     #[cfg(feature = "verify_binary_signature")]
-    {
-        use verify_binary_signature::{get_dll_absolute_path, get_signer_name, verify_signature};
-        // Ensure the dll file has not been tampered with.
-        let abs_path = unsafe { get_dll_absolute_path(&path) }?;
-        verify_signature(&abs_path)?;
+    let (path2, _locked) = {
+        use verify_binary_signature::{get_signer_name, open_locked, resolve_dll_path, verify_signature};
+        // Ensure the dll file has not been tampered with, before any of its code runs.
+        // The file stays locked until it is loaded, and is loaded by the path that was checked.
+        let abs_path = resolve_dll_path(std::path::Path::new(path.as_ref()))?;
+        let file = open_locked(&abs_path)?;
+        verify_signature(&abs_path, Some(&file))?;
         let signer_name = get_signer_name(&abs_path)?;
         let wp = WINTUN_PROVIDER;
         if signer_name != wp {
             return Err(format!("Signer \"{}\" not match \"{}\"", signer_name, wp).into());
         }
-    }
+        (abs_path, file)
+    };
+    #[cfg(not(feature = "verify_binary_signature"))]
     let path2: std::path::PathBuf = path.as_ref().into();
     unsafe { Ok(Arc::new(wintun_raw::wintun::new(&path2)?)) }
 }
